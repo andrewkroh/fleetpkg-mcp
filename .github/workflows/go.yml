@@ -1,0 +1,49 @@
+name: go
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: go.mod tidy
+        run: go mod tidy && git diff --exit-code
+
+      - name: license header
+        run: go run github.com/elastic/go-licenser@v0.4.2 -license ASL2-Short -d
+
+  test:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/checkout@v5
+        with:
+          repository: elastic/integrations
+          path: integrations
+
+      - uses: actions/setup-go@v5
+        id: setup_go
+        with:
+          go-version: stable
+
+      - name: Test
+        run: go test -v ./...
+        env:
+          INTEGRATIONS_DIR: ./integrations
+
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: golang/govulncheck-action@v1
