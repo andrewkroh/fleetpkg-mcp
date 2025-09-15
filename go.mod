@@ -5,13 +5,14 @@ go 1.24.6
 require (
 	github.com/andrewkroh/go-fleetpkg v0.0.18
 	github.com/gorilla/handlers v1.5.2
-	github.com/modelcontextprotocol/go-sdk v0.2.0
+	github.com/modelcontextprotocol/go-sdk v0.5.0
 	modernc.org/sqlite v1.38.2
 )
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/google/jsonschema-go v0.2.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
