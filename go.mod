@@ -6,7 +6,7 @@ require (
 	github.com/andrewkroh/go-fleetpkg v0.0.18
 	github.com/gorilla/handlers v1.5.2
 	github.com/modelcontextprotocol/go-sdk v0.2.0
-	modernc.org/sqlite v1.38.2
+	modernc.org/sqlite v1.39.0
 )
 
 require (
