@@ -53,39 +53,39 @@ Be sure you have called fleetpkg_get_sql_tables() first to understand the struct
 	}, t.executeQuery)
 }
 
-func (t *tools) getSQLTables(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[struct{}]) (*mcp.CallToolResultFor[struct{}], error) {
+func (t *tools) getSQLTables(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
 	schemas := strings.Join(t.tables, "\n")
-	return &mcp.CallToolResultFor[struct{}]{
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: schemas},
 		},
-	}, nil
+	}, nil, nil
 }
 
 type ExecuteQueryArgs struct {
 	Statement string `json:"statement" jsonschema:"SQLite query to execute"`
 }
 
-func (t *tools) executeQuery(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[ExecuteQueryArgs]) (*mcp.CallToolResultFor[struct{}], error) {
+func (t *tools) executeQuery(ctx context.Context, req *mcp.CallToolRequest, args ExecuteQueryArgs) (*mcp.CallToolResult, any, error) {
 	db := t.db.Load()
 	if db == nil {
 		t.log.WarnContext(ctx, "Database not ready yet")
-		return mcpErrorf[struct{}]("database is still initializing, please retry in a moment"), nil
+		return mcpErrorf("database is still initializing, please retry in a moment"), nil, nil
 	}
 
-	t.log.InfoContext(ctx, "Executing query", "statement", params.Arguments.Statement)
+	t.log.InfoContext(ctx, "Executing query", "statement", args.Statement)
 
-	rows, err := db.QueryContext(ctx, params.Arguments.Statement)
+	rows, err := db.QueryContext(ctx, args.Statement)
 	if err != nil {
 		t.log.ErrorContext(ctx, "error executing query", "error", err)
-		return mcpErrorf[struct{}]("failed to execute query: %v", err), nil
+		return mcpErrorf("failed to execute query: %v", err), nil, nil
 	}
 	defer rows.Close()
 
 	columns, err := rows.Columns()
 	if err != nil {
 		t.log.ErrorContext(ctx, "Error getting columns", "error", err)
-		return mcpErrorf[struct{}]("failed to get columns: %v", err), nil
+		return mcpErrorf("failed to get columns: %v", err), nil, nil
 	}
 
 	var result []map[string]interface{}
@@ -98,7 +98,7 @@ func (t *tools) executeQuery(ctx context.Context, ss *mcp.ServerSession, params 
 
 		if err := rows.Scan(pointers...); err != nil {
 			t.log.ErrorContext(ctx, "Error scanning row", "error", err)
-			return mcpErrorf[struct{}]("failed to scan row: %v", err), nil
+			return mcpErrorf("failed to scan row: %v", err), nil, nil
 		}
 
 		row := make(map[string]interface{})
@@ -116,23 +116,24 @@ func (t *tools) executeQuery(ctx context.Context, ss *mcp.ServerSession, params 
 	jsonRows, err := json.Marshal(result)
 	if err != nil {
 		t.log.ErrorContext(ctx, "Error marshaling results", slog.Any("error", err))
-		return mcpErrorf[struct{}]("failed to marshal result: %v", err), nil
+		return mcpErrorf("failed to marshal result: %v", err), nil, nil
 	}
 
 	t.log.InfoContext(ctx, "Query executed successfully", "row_count", len(result))
-	return &mcp.CallToolResultFor[struct{}]{
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: string(jsonRows)},
 		},
-	}, nil
+	}, nil, nil
 }
 
-func mcpErrorf[T any](format string, args ...interface{}) *mcp.CallToolResultFor[T] {
-	return &mcp.CallToolResultFor[T]{
+func mcpErrorf(format string, args ...interface{}) *mcp.CallToolResult {
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{
 				Text: fmt.Sprintf("ERROR: "+format, args...),
 			},
 		},
+		IsError: true,
 	}
 }

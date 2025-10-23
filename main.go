@@ -146,7 +146,10 @@ func run(integrationsDir string) error {
 	// Stdin/stdout comms - also start immediately
 	serveDone := make(chan error, 1)
 	go func() {
-		t := mcp.NewLoggingTransport(mcp.NewStdioTransport(), logOutput)
+		t := &mcp.LoggingTransport{
+			Transport: &mcp.StdioTransport{},
+			Writer:    logOutput,
+		}
 		serveDone <- s.Run(ctx, t)
 	}()
 
