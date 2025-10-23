@@ -45,11 +45,35 @@ then determine the path using `which fleetpkg-mcp`.
 {
   "mcpServers": {
     "fleetpkg": {
-      "command": "/Users/<USERNAME>/go/bin/fleetpkg-mcp"
+      "command": "/Users/<USERNAME>/go/bin/fleetpkg-mcp",
+      "args": [
+        "-dir"
+        "/Users/<USERNAME>/code/elastic/integrations"
+      ]
     }
   }
 }
 ```
+
+### Claude setup with stdio
+
+Add:
+
+`claude mcp add --scope user fleetpkg -- /Users/<USERNAME>/go/bin/fleetpkg-mcp -dir /Users/akroh/code/elastic/integrations`
+
+Removal:
+
+`claude mcp remove fleetpkg`
+
+### Claude setup with http
+
+Add:
+
+`claude mcp add --scope user --transport http fleetpkg http://127.0.0.1:1234`
+
+Removal:
+
+`claude mcp remove fleetpkg`
 
 ### Required Arguments
 

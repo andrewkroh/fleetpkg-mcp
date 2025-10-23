@@ -11,17 +11,18 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync/atomic"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type tools struct {
 	tables []string
-	db     *sql.DB
+	db     *atomic.Pointer[sql.DB]
 	log    *slog.Logger
 }
 
-func newTools(tables []string, db *sql.DB, log *slog.Logger) *tools {
+func newTools(tables []string, db *atomic.Pointer[sql.DB], log *slog.Logger) *tools {
 	return &tools{
 		tables: tables,
 		db:     db,
@@ -29,7 +30,7 @@ func newTools(tables []string, db *sql.DB, log *slog.Logger) *tools {
 	}
 }
 
-func AddTools(s *mcp.Server, tables []string, db *sql.DB, log *slog.Logger) {
+func AddTools(s *mcp.Server, tables []string, db *atomic.Pointer[sql.DB], log *slog.Logger) {
 	t := newTools(tables, db, log)
 
 	mcp.AddTool(s, &mcp.Tool{
@@ -66,9 +67,15 @@ type ExecuteQueryArgs struct {
 }
 
 func (t *tools) executeQuery(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[ExecuteQueryArgs]) (*mcp.CallToolResultFor[struct{}], error) {
+	db := t.db.Load()
+	if db == nil {
+		t.log.WarnContext(ctx, "Database not ready yet")
+		return mcpErrorf[struct{}]("database is still initializing, please retry in a moment"), nil
+	}
+
 	t.log.InfoContext(ctx, "Executing query", "statement", params.Arguments.Statement)
 
-	rows, err := t.db.QueryContext(ctx, params.Arguments.Statement)
+	rows, err := db.QueryContext(ctx, params.Arguments.Statement)
 	if err != nil {
 		t.log.ErrorContext(ctx, "error executing query", "error", err)
 		return mcpErrorf[struct{}]("failed to execute query: %v", err), nil
