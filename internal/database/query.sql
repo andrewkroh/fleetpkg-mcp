@@ -143,3 +143,7 @@ VALUES (?, ?);
 -- name: InsertIntegrationIcon :one
 INSERT INTO integration_icons (integration_id, src, title, size, type, dark_mode)
 VALUES (?, ?, ?, ?, ?, ?) RETURNING id;
+
+-- name: InsertIntegrationScreenshot :one
+INSERT INTO integration_screenshots (integration_id, src, title, size, type)
+VALUES (?, ?, ?, ?, ?) RETURNING id;

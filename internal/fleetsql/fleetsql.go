@@ -99,6 +99,20 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 		}
 	}
 
+	// Integration screenshots.
+	for _, screenshot := range in.Manifest.Screenshots {
+		_, err = q.InsertIntegrationScreenshot(ctx, database.InsertIntegrationScreenshotParams{
+			IntegrationID: integID,
+			Src:           sqlStringEmtpyIsNull(screenshot.Src),
+			Title:         sqlStringEmtpyIsNull(screenshot.Title),
+			Size:          sqlStringEmtpyIsNull(screenshot.Size),
+			Type:          sqlStringEmtpyIsNull(screenshot.Type),
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	// Integration top-level variables.
 	for _, v := range in.Manifest.Vars {
 		varID, err := insertVar(ctx, q, &v)
