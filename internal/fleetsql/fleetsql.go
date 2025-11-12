@@ -697,6 +697,21 @@ func insertTransform(ctx context.Context, q *database.Queries, integID int64, t 
 	if err != nil {
 		return 0, err
 	}
+
+	// Transform destination aliases.
+	if t.Transform != nil && t.Transform.Dest != nil {
+		for _, alias := range t.Transform.Dest.Aliases {
+			_, err = q.InsertTransformDestAlias(ctx, database.InsertTransformDestAliasParams{
+				TransformID:    id,
+				Alias:          sqlNullString(alias.Alias),
+				MoveOnCreation: sqlNullBool(alias.MoveOnCreation),
+			})
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+
 	return id, nil
 }
 
