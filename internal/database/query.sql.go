@@ -472,6 +472,32 @@ func (q *Queries) InsertPolicyTemplateInputVars(ctx context.Context, arg InsertP
 	return err
 }
 
+const insertPolicyTemplateScreenshot = `-- name: InsertPolicyTemplateScreenshot :one
+INSERT INTO policy_template_screenshots (policy_template_id, src, title, size, type)
+VALUES (?, ?, ?, ?, ?) RETURNING id
+`
+
+type InsertPolicyTemplateScreenshotParams struct {
+	PolicyTemplateID int64
+	Src              sql.NullString
+	Title            sql.NullString
+	Size             sql.NullString
+	Type             sql.NullString
+}
+
+func (q *Queries) InsertPolicyTemplateScreenshot(ctx context.Context, arg InsertPolicyTemplateScreenshotParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertPolicyTemplateScreenshot,
+		arg.PolicyTemplateID,
+		arg.Src,
+		arg.Title,
+		arg.Size,
+		arg.Type,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertPolicyTemplateVar = `-- name: InsertPolicyTemplateVar :exec
 INSERT INTO policy_template_vars (policy_template_id, var_id)
 VALUES (?, ?)

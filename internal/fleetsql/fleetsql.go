@@ -173,6 +173,20 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 			}
 		}
 
+		// Policy template screenshots.
+		for _, screenshot := range pt.Screenshots {
+			_, err = q.InsertPolicyTemplateScreenshot(ctx, database.InsertPolicyTemplateScreenshotParams{
+				PolicyTemplateID: ptID,
+				Src:              sqlStringEmtpyIsNull(screenshot.Src),
+				Title:            sqlStringEmtpyIsNull(screenshot.Title),
+				Size:             sqlStringEmtpyIsNull(screenshot.Size),
+				Type:             sqlStringEmtpyIsNull(screenshot.Type),
+			})
+			if err != nil {
+				return err
+			}
+		}
+
 		// Policy template variables.
 		for _, v := range pt.Vars {
 			varID, err := insertVar(ctx, q, &v)
