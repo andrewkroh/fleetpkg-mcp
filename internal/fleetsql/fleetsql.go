@@ -376,12 +376,42 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 
 	// Integration changelog.
 	if in.Changelog.Path() != "" {
-		_, err = q.InsertChangelog(ctx, database.InsertChangelogParams{
+		changelogID, err := q.InsertChangelog(ctx, database.InsertChangelogParams{
 			IntegrationID: integID,
 			FilePath:      in.Changelog.Path(),
 		})
 		if err != nil {
 			return err
+		}
+
+		// Changelog releases.
+		for _, release := range in.Changelog.Releases {
+			releaseID, err := q.InsertRelease(ctx, database.InsertReleaseParams{
+				ChangelogID: changelogID,
+				Version:     sqlStringEmtpyIsNull(release.Version),
+				FilePath:    release.Path(),
+				LineNumber:  sql.NullInt64{Int64: int64(release.Line()), Valid: release.Line() > 0},
+				Col:         sql.NullInt64{Int64: int64(release.Column()), Valid: release.Column() > 0},
+			})
+			if err != nil {
+				return err
+			}
+
+			// Release changes.
+			for _, change := range release.Changes {
+				_, err = q.InsertChange(ctx, database.InsertChangeParams{
+					ReleaseID:   releaseID,
+					Description: sqlStringEmtpyIsNull(change.Description),
+					Type:        sqlStringEmtpyIsNull(change.Type),
+					Link:        sqlStringEmtpyIsNull(change.Link),
+					FilePath:    change.Path(),
+					LineNumber:  sql.NullInt64{Int64: int64(change.Line()), Valid: change.Line() > 0},
+					Col:         sql.NullInt64{Int64: int64(change.Column()), Valid: change.Column() > 0},
+				})
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
 
