@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"sync/atomic"
+	"time"
 
 	"github.com/andrewkroh/go-fleetpkg"
 	"github.com/gorilla/handlers"
@@ -90,6 +91,7 @@ func run(integrationsDir string) error {
 	// Start initialization in background
 	initErrCh := make(chan error, 1)
 	go func() {
+		start := time.Now()
 		log.Info("Starting database initialization...")
 		db, err := initializeDatabase(ctx, log, integrationsDir)
 		if err != nil {
@@ -98,7 +100,7 @@ func run(integrationsDir string) error {
 			return
 		}
 		dbPtr.Store(db)
-		log.Info("Database initialization completed")
+		log.Info("Database initialization completed", slog.Any("duration", time.Since(start)))
 		close(initErrCh)
 	}()
 
