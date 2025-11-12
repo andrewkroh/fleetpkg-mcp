@@ -397,6 +397,34 @@ func (q *Queries) InsertPolicyTemplateDataStream(ctx context.Context, arg Insert
 	return err
 }
 
+const insertPolicyTemplateIcon = `-- name: InsertPolicyTemplateIcon :one
+INSERT INTO policy_template_icons (policy_template_id, src, title, size, type, dark_mode)
+VALUES (?, ?, ?, ?, ?, ?) RETURNING id
+`
+
+type InsertPolicyTemplateIconParams struct {
+	PolicyTemplateID int64
+	Src              sql.NullString
+	Title            sql.NullString
+	Size             sql.NullString
+	Type             sql.NullString
+	DarkMode         sql.NullBool
+}
+
+func (q *Queries) InsertPolicyTemplateIcon(ctx context.Context, arg InsertPolicyTemplateIconParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertPolicyTemplateIcon,
+		arg.PolicyTemplateID,
+		arg.Src,
+		arg.Title,
+		arg.Size,
+		arg.Type,
+		arg.DarkMode,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertPolicyTemplateInput = `-- name: InsertPolicyTemplateInput :one
 INSERT INTO policy_template_inputs (policy_template_id, type, title,
                                     description,
