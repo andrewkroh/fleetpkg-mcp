@@ -237,7 +237,7 @@ CREATE TABLE IF NOT EXISTS policy_template_categories (
 const PolicyTemplateDataStreamsTableStatement = `-- Data streams associated with policy templates. Join table for many-to-many relationship.
 CREATE TABLE IF NOT EXISTS policy_template_data_streams (
     policy_template_id INTEGER NOT NULL, -- foreign key to policy_templates table
-    data_stream_name TEXT, -- name of the data stream
+    data_stream_name TEXT NOT NULL, -- name of the data stream
     PRIMARY KEY (policy_template_id, data_stream_name),
     FOREIGN KEY (policy_template_id) REFERENCES policy_templates(id)
 );`

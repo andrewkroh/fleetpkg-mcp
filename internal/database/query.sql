@@ -136,3 +136,6 @@ VALUES (?, ?);
 INSERT INTO policy_template_categories (policy_template_id, category)
 VALUES (?, ?);
 
+-- name: InsertPolicyTemplateDataStream :exec
+INSERT INTO policy_template_data_streams (policy_template_id, data_stream_name)
+VALUES (?, ?);

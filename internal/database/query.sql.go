@@ -328,6 +328,21 @@ func (q *Queries) InsertPolicyTemplateCategory(ctx context.Context, arg InsertPo
 	return err
 }
 
+const insertPolicyTemplateDataStream = `-- name: InsertPolicyTemplateDataStream :exec
+INSERT INTO policy_template_data_streams (policy_template_id, data_stream_name)
+VALUES (?, ?)
+`
+
+type InsertPolicyTemplateDataStreamParams struct {
+	PolicyTemplateID int64
+	DataStreamName   string
+}
+
+func (q *Queries) InsertPolicyTemplateDataStream(ctx context.Context, arg InsertPolicyTemplateDataStreamParams) error {
+	_, err := q.db.ExecContext(ctx, insertPolicyTemplateDataStream, arg.PolicyTemplateID, arg.DataStreamName)
+	return err
+}
+
 const insertPolicyTemplateInput = `-- name: InsertPolicyTemplateInput :one
 INSERT INTO policy_template_inputs (policy_template_id, type, title,
                                     description,
