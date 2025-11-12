@@ -173,3 +173,7 @@ VALUES (?, ?, ?, ?) RETURNING id;
 INSERT INTO ingest_pipelines (data_stream_id, name, description, version, meta,
                                file_path)
 VALUES (?, ?, ?, ?, ?, ?) RETURNING id;
+
+-- name: InsertSampleEvent :one
+INSERT INTO sample_events (data_stream_id, event, file_path)
+VALUES (?, ?, ?) RETURNING id;

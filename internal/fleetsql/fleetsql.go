@@ -330,6 +330,18 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 				return err
 			}
 		}
+
+		// Data stream sample event.
+		if ds.SampleEvent != nil {
+			_, err = q.InsertSampleEvent(ctx, database.InsertSampleEventParams{
+				DataStreamID: dsID,
+				Event:        jsonNullString(ds.SampleEvent.Event),
+				FilePath:     ds.SampleEvent.Path(),
+			})
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	// Integration transforms.
