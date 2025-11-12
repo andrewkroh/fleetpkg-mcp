@@ -248,6 +248,34 @@ func (q *Queries) InsertIntegrationCategory(ctx context.Context, arg InsertInteg
 	return err
 }
 
+const insertIntegrationIcon = `-- name: InsertIntegrationIcon :one
+INSERT INTO integration_icons (integration_id, src, title, size, type, dark_mode)
+VALUES (?, ?, ?, ?, ?, ?) RETURNING id
+`
+
+type InsertIntegrationIconParams struct {
+	IntegrationID int64
+	Src           sql.NullString
+	Title         sql.NullString
+	Size          sql.NullString
+	Type          sql.NullString
+	DarkMode      sql.NullBool
+}
+
+func (q *Queries) InsertIntegrationIcon(ctx context.Context, arg InsertIntegrationIconParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertIntegrationIcon,
+		arg.IntegrationID,
+		arg.Src,
+		arg.Title,
+		arg.Size,
+		arg.Type,
+		arg.DarkMode,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertIntegrationVar = `-- name: InsertIntegrationVar :exec
 INSERT INTO integration_vars (integration_id, var_id)
 VALUES (?, ?)

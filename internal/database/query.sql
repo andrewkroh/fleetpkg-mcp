@@ -139,3 +139,7 @@ VALUES (?, ?);
 -- name: InsertPolicyTemplateDataStream :exec
 INSERT INTO policy_template_data_streams (policy_template_id, data_stream_name)
 VALUES (?, ?);
+
+-- name: InsertIntegrationIcon :one
+INSERT INTO integration_icons (integration_id, src, title, size, type, dark_mode)
+VALUES (?, ?, ?, ?, ?, ?) RETURNING id;

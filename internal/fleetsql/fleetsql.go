@@ -84,6 +84,21 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 		}
 	}
 
+	// Integration icons.
+	for _, icon := range in.Manifest.Icons {
+		_, err = q.InsertIntegrationIcon(ctx, database.InsertIntegrationIconParams{
+			IntegrationID: integID,
+			Src:           sqlStringEmtpyIsNull(icon.Src),
+			Title:         sqlStringEmtpyIsNull(icon.Title),
+			Size:          sqlStringEmtpyIsNull(icon.Size),
+			Type:          sqlStringEmtpyIsNull(icon.Type),
+			DarkMode:      sqlNullBool(icon.DarkMode),
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	// Integration top-level variables.
 	for _, v := range in.Manifest.Vars {
 		varID, err := insertVar(ctx, q, &v)
