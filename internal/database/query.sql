@@ -159,3 +159,7 @@ VALUES (?, ?, ?, ?, ?) RETURNING id;
 -- name: InsertVarOption :one
 INSERT INTO var_options (var_id, value, text)
 VALUES (?, ?, ?) RETURNING id;
+
+-- name: InsertDiscoveryField :one
+INSERT INTO discovery_fields (integration_id, name)
+VALUES (?, ?) RETURNING id;

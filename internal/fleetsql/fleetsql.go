@@ -113,6 +113,19 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 		}
 	}
 
+	// Discovery fields.
+	if in.Manifest.Discovery != nil {
+		for _, field := range in.Manifest.Discovery.Fields {
+			_, err = q.InsertDiscoveryField(ctx, database.InsertDiscoveryFieldParams{
+				IntegrationID: integID,
+				Name:          sqlStringEmtpyIsNull(field.Name),
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	// Integration top-level variables.
 	for _, v := range in.Manifest.Vars {
 		varID, err := insertVar(ctx, q, &v)
