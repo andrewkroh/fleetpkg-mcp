@@ -92,6 +92,23 @@ func (q *Queries) InsertDataStreamField(ctx context.Context, arg InsertDataStrea
 	return err
 }
 
+const insertDiscoveryField = `-- name: InsertDiscoveryField :one
+INSERT INTO discovery_fields (integration_id, name)
+VALUES (?, ?) RETURNING id
+`
+
+type InsertDiscoveryFieldParams struct {
+	IntegrationID int64
+	Name          sql.NullString
+}
+
+func (q *Queries) InsertDiscoveryField(ctx context.Context, arg InsertDiscoveryFieldParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertDiscoveryField, arg.IntegrationID, arg.Name)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertField = `-- name: InsertField :one
 INSERT INTO fields (name, type, description, value, example, pattern,
                     date_format,
