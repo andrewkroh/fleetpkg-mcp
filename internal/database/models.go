@@ -14,7 +14,7 @@ import (
 
 type BuildManifest struct {
 	ID                            int64
-	IntegrationID                 sql.NullInt64
+	IntegrationID                 int64
 	DependenciesEcsReference      sql.NullString
 	DependenciesEcsImportMappings sql.NullBool
 	FilePath                      string
@@ -22,7 +22,7 @@ type BuildManifest struct {
 
 type Change struct {
 	ID          int64
-	ReleaseID   sql.NullInt64
+	ReleaseID   int64
 	Description sql.NullString
 	Type        sql.NullString
 	Link        sql.NullString
@@ -33,7 +33,7 @@ type Change struct {
 
 type Changelog struct {
 	ID            int64
-	IntegrationID sql.NullInt64
+	IntegrationID int64
 	FilePath      string
 }
 
@@ -67,7 +67,7 @@ type DataStreamField struct {
 
 type DiscoveryField struct {
 	ID            int64
-	IntegrationID sql.NullInt64
+	IntegrationID int64
 	Name          sql.NullString
 }
 
@@ -106,7 +106,7 @@ type Field struct {
 
 type IngestPipeline struct {
 	ID           int64
-	DataStreamID sql.NullInt64
+	DataStreamID int64
 	Name         sql.NullString
 	Description  sql.NullString
 	Version      sql.NullInt64
@@ -143,7 +143,7 @@ type IntegrationCategory struct {
 
 type IntegrationIcon struct {
 	ID            int64
-	IntegrationID sql.NullInt64
+	IntegrationID int64
 	Src           sql.NullString
 	Title         sql.NullString
 	Size          sql.NullString
@@ -153,7 +153,7 @@ type IntegrationIcon struct {
 
 type IntegrationScreenshot struct {
 	ID            int64
-	IntegrationID sql.NullInt64
+	IntegrationID int64
 	Src           sql.NullString
 	Title         sql.NullString
 	Size          sql.NullString
@@ -192,13 +192,13 @@ type PolicyTemplateCategory struct {
 }
 
 type PolicyTemplateDataStream struct {
-	PolicyTemplateID sql.NullInt64
+	PolicyTemplateID int64
 	DataStreamName   sql.NullString
 }
 
 type PolicyTemplateIcon struct {
 	ID               int64
-	PolicyTemplateID sql.NullInt64
+	PolicyTemplateID int64
 	Src              sql.NullString
 	Title            sql.NullString
 	Size             sql.NullString
@@ -224,7 +224,7 @@ type PolicyTemplateInputVar struct {
 
 type PolicyTemplateScreenshot struct {
 	ID               int64
-	PolicyTemplateID sql.NullInt64
+	PolicyTemplateID int64
 	Src              sql.NullString
 	Title            sql.NullString
 	Size             sql.NullString
@@ -238,7 +238,7 @@ type PolicyTemplateVar struct {
 
 type Release struct {
 	ID          int64
-	ChangelogID sql.NullInt64
+	ChangelogID int64
 	Version     sql.NullString
 	FilePath    string
 	LineNumber  sql.NullInt64
@@ -247,7 +247,7 @@ type Release struct {
 
 type SampleEvent struct {
 	ID           int64
-	DataStreamID sql.NullInt64
+	DataStreamID int64
 	Event        sql.NullString
 	FilePath     string
 }
@@ -304,7 +304,7 @@ type Transform struct {
 
 type TransformDestAlias struct {
 	ID             int64
-	TransformID    sql.NullInt64
+	TransformID    int64
 	Alias          sql.NullString
 	MoveOnCreation sql.NullBool
 }
@@ -333,7 +333,7 @@ type Var struct {
 
 type VarOption struct {
 	ID    int64
-	VarID sql.NullInt64
+	VarID int64
 	Value sql.NullString
 	Text  sql.NullString
 }

@@ -236,7 +236,7 @@ CREATE TABLE IF NOT EXISTS policy_template_categories (
 
 const PolicyTemplateDataStreamsTableStatement = `-- Data streams associated with policy templates. Join table for many-to-many relationship.
 CREATE TABLE IF NOT EXISTS policy_template_data_streams (
-    policy_template_id INTEGER, -- foreign key to policy_templates table
+    policy_template_id INTEGER NOT NULL, -- foreign key to policy_templates table
     data_stream_name TEXT, -- name of the data stream
     PRIMARY KEY (policy_template_id, data_stream_name),
     FOREIGN KEY (policy_template_id) REFERENCES policy_templates(id)
@@ -253,7 +253,7 @@ CREATE TABLE IF NOT EXISTS integration_categories (
 const IntegrationIconsTableStatement = `-- Icons associated with integrations. Related to integrations via foreign key.
 CREATE TABLE IF NOT EXISTS integration_icons (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
-    integration_id INTEGER, -- foreign key to integrations table
+    integration_id INTEGER NOT NULL, -- foreign key to integrations table
     src TEXT, -- source path of the icon
     title TEXT, -- title of the icon
     size TEXT, -- size specification
@@ -265,7 +265,7 @@ CREATE TABLE IF NOT EXISTS integration_icons (
 const IntegrationScreenshotsTableStatement = `-- Screenshots associated with integrations. Related to integrations via foreign key.
 CREATE TABLE IF NOT EXISTS integration_screenshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
-    integration_id INTEGER, -- foreign key to integrations table
+    integration_id INTEGER NOT NULL, -- foreign key to integrations table
     src TEXT, -- source path of the screenshot
     title TEXT, -- title of the screenshot
     size TEXT, -- size specification
@@ -276,7 +276,7 @@ CREATE TABLE IF NOT EXISTS integration_screenshots (
 const PolicyTemplateIconsTableStatement = `-- Icons associated with policy templates. Related to policy_templates via foreign key.
 CREATE TABLE IF NOT EXISTS policy_template_icons (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
-    policy_template_id INTEGER, -- foreign key to policy_templates table
+    policy_template_id INTEGER NOT NULL, -- foreign key to policy_templates table
     src TEXT, -- source path of the icon
     title TEXT, -- title of the icon
     size TEXT, -- size specification
@@ -288,7 +288,7 @@ CREATE TABLE IF NOT EXISTS policy_template_icons (
 const PolicyTemplateScreenshotsTableStatement = `-- Screenshots associated with policy templates. Related to policy_templates via foreign key.
 CREATE TABLE IF NOT EXISTS policy_template_screenshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
-    policy_template_id INTEGER, -- foreign key to policy_templates table
+    policy_template_id INTEGER NOT NULL, -- foreign key to policy_templates table
     src TEXT, -- source path of the screenshot
     title TEXT, -- title of the screenshot
     size TEXT, -- size specification
@@ -299,7 +299,7 @@ CREATE TABLE IF NOT EXISTS policy_template_screenshots (
 const VarOptionsTableStatement = `-- Options for select-type variables. Related to vars via foreign key.
 CREATE TABLE IF NOT EXISTS var_options (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
-    var_id INTEGER, -- foreign key to vars table
+    var_id INTEGER NOT NULL, -- foreign key to vars table
     value TEXT, -- option value
     text TEXT, -- display text for the option
     FOREIGN KEY (var_id) REFERENCES vars(id)
@@ -327,7 +327,7 @@ CREATE TABLE IF NOT EXISTS transform_fields (
 const TransformDestAliasesTableStatement = `-- Aliases for transform destination indices. Related to transforms via foreign key.
 CREATE TABLE IF NOT EXISTS transform_dest_aliases (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
-    transform_id INTEGER, -- foreign key to transforms table
+    transform_id INTEGER NOT NULL, -- foreign key to transforms table
     alias TEXT, -- name of the alias
     move_on_creation BOOLEAN, -- whether the destination index should be the only index in this alias
     FOREIGN KEY (transform_id) REFERENCES transforms(id)
@@ -336,7 +336,7 @@ CREATE TABLE IF NOT EXISTS transform_dest_aliases (
 const DiscoveryFieldsTableStatement = `-- Fields associated with package discovery capabilities. Related to integrations via foreign key.
 CREATE TABLE IF NOT EXISTS discovery_fields (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
-    integration_id INTEGER, -- foreign key to integrations table
+    integration_id INTEGER NOT NULL, -- foreign key to integrations table
     name TEXT, -- name of the field
     FOREIGN KEY (integration_id) REFERENCES integrations(id)
 );`
@@ -344,7 +344,7 @@ CREATE TABLE IF NOT EXISTS discovery_fields (
 const BuildManifestsTableStatement = `-- Build configuration for integration packages. Related to integrations via foreign key.
 CREATE TABLE IF NOT EXISTS build_manifests (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
-    integration_id INTEGER, -- foreign key to integrations table
+    integration_id INTEGER NOT NULL, -- foreign key to integrations table
     dependencies_ecs_reference TEXT, -- ECS source reference
     dependencies_ecs_import_mappings BOOLEAN, -- whether to import common used dynamic templates and properties
     file_path TEXT NOT NULL, -- path to the build.yml file
@@ -354,7 +354,7 @@ CREATE TABLE IF NOT EXISTS build_manifests (
 const ChangelogsTableStatement = `-- Version history for integration packages. Related to integrations via foreign key.
 CREATE TABLE IF NOT EXISTS changelogs (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
-    integration_id INTEGER, -- foreign key to integrations table
+    integration_id INTEGER NOT NULL, -- foreign key to integrations table
     file_path TEXT NOT NULL, -- path to the changelog file
     FOREIGN KEY (integration_id) REFERENCES integrations(id)
 );`
@@ -362,7 +362,7 @@ CREATE TABLE IF NOT EXISTS changelogs (
 const ReleasesTableStatement = `-- Individual releases within changelogs. Related to changelogs via foreign key.
 CREATE TABLE IF NOT EXISTS releases (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
-    changelog_id INTEGER, -- foreign key to changelogs table
+    changelog_id INTEGER NOT NULL, -- foreign key to changelogs table
     version TEXT, -- version of the release
     file_path TEXT NOT NULL, -- file path where the release is defined
     line_number INTEGER, -- line number in the file
@@ -373,7 +373,7 @@ CREATE TABLE IF NOT EXISTS releases (
 const ChangesTableStatement = `-- Individual changes within releases. Related to releases via foreign key.
 CREATE TABLE IF NOT EXISTS changes (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
-    release_id INTEGER, -- foreign key to releases table
+    release_id INTEGER NOT NULL, -- foreign key to releases table
     description TEXT, -- description of the change
     type TEXT, -- type of change (e.g., enhancement, bugfix)
     link TEXT, -- link to more information about the change
@@ -386,7 +386,7 @@ CREATE TABLE IF NOT EXISTS changes (
 const IngestPipelinesTableStatement = `-- Ingest pipeline configurations within data streams. Related to data_streams via foreign key.
 CREATE TABLE IF NOT EXISTS ingest_pipelines (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
-    data_stream_id INTEGER, -- foreign key to data_streams table
+    data_stream_id INTEGER NOT NULL, -- foreign key to data_streams table
     name TEXT, -- name of the pipeline (key from the map)
     description TEXT, -- description of the ingest pipeline
     version INTEGER, -- version number used by external systems to track ingest pipelines
@@ -398,7 +398,7 @@ CREATE TABLE IF NOT EXISTS ingest_pipelines (
 const SampleEventsTableStatement = `-- Sample event data for data streams. Related to data_streams via foreign key.
 CREATE TABLE IF NOT EXISTS sample_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
-    data_stream_id INTEGER, -- foreign key to data_streams table
+    data_stream_id INTEGER NOT NULL, -- foreign key to data_streams table
     event TEXT, -- sample event data (JSON)
     file_path TEXT NOT NULL, -- path to the sample event file
     FOREIGN KEY (data_stream_id) REFERENCES data_streams(id)
