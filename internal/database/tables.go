@@ -401,7 +401,7 @@ CREATE TABLE IF NOT EXISTS ingest_processors (
     ingest_pipeline_id INTEGER NOT NULL, -- foreign key to ingest_pipelines table
     type TEXT NOT NULL, -- ingest processor type
     attributes JSON, -- processor configuration (JSON)
-    json_pointer TEXT NOT NULL, -- JSON Pointer (RFC 6901) location within the pipeline
+    json_pointer TEXT NOT NULL, -- JSON Pointer (RFC 6901) location within the pipeline (e.g. '/processors/12/append' or '/on_failure/1/append').
     file_path TEXT NOT NULL, -- file path where the processor is defined
     line_number INTEGER NOT NULL, -- line number in the file
     col INTEGER NOT NULL, -- character position in the file

@@ -42,7 +42,7 @@ func TestFlattenProcessors(t *testing.T) {
 			wantCount: 1,
 			validate: func(t *testing.T, result []FlatProcessor) {
 				assert.Equal(t, "set", result[0].Type)
-				assert.Equal(t, "/processors/0", result[0].JSONPointer)
+				assert.Equal(t, "/processors/0/set", result[0].JSONPointer)
 				assert.Equal(t, "test.field", result[0].Attributes["field"])
 				assert.NotContains(t, result[0].Attributes, "on_failure")
 			},
@@ -72,12 +72,12 @@ func TestFlattenProcessors(t *testing.T) {
 			validate: func(t *testing.T, result []FlatProcessor) {
 				// First should be the on_failure handler
 				assert.Equal(t, "set", result[0].Type)
-				assert.Equal(t, "/processors/0/on_failure/0", result[0].JSONPointer)
+				assert.Equal(t, "/processors/0/rename/on_failure/0/set", result[0].JSONPointer)
 				assert.Equal(t, "error.message", result[0].Attributes["field"])
 
 				// Second should be the parent processor
 				assert.Equal(t, "rename", result[1].Type)
-				assert.Equal(t, "/processors/0", result[1].JSONPointer)
+				assert.Equal(t, "/processors/0/rename", result[1].JSONPointer)
 				assert.Contains(t, result[1].Attributes, "on_failure")
 
 				// Verify on_failure is properly serialized
@@ -123,9 +123,9 @@ func TestFlattenProcessors(t *testing.T) {
 				for i, p := range result {
 					pointers[i] = p.JSONPointer
 				}
-				assert.Contains(t, pointers, "/processors/0/on_failure/0/on_failure/0")
-				assert.Contains(t, pointers, "/processors/0/on_failure/0")
-				assert.Contains(t, pointers, "/processors/0")
+				assert.Contains(t, pointers, "/processors/0/grok/on_failure/0/set/on_failure/0/append")
+				assert.Contains(t, pointers, "/processors/0/grok/on_failure/0/set")
+				assert.Contains(t, pointers, "/processors/0/grok")
 			},
 		},
 		{
@@ -157,9 +157,9 @@ func TestFlattenProcessors(t *testing.T) {
 			basePath:  "/processors",
 			wantCount: 3, // 2 regular + 1 on_failure
 			validate: func(t *testing.T, result []FlatProcessor) {
-				assert.Equal(t, "/processors/0", result[0].JSONPointer)
-				assert.Equal(t, "/processors/1/on_failure/0", result[1].JSONPointer)
-				assert.Equal(t, "/processors/1", result[2].JSONPointer)
+				assert.Equal(t, "/processors/0/set", result[0].JSONPointer)
+				assert.Equal(t, "/processors/1/convert/on_failure/0/remove", result[1].JSONPointer)
+				assert.Equal(t, "/processors/1/convert", result[2].JSONPointer)
 			},
 		},
 		{
@@ -176,7 +176,7 @@ func TestFlattenProcessors(t *testing.T) {
 			basePath:  "/on_failure",
 			wantCount: 1,
 			validate: func(t *testing.T, result []FlatProcessor) {
-				assert.Equal(t, "/on_failure/0", result[0].JSONPointer)
+				assert.Equal(t, "/on_failure/0/set", result[0].JSONPointer)
 			},
 		},
 	}

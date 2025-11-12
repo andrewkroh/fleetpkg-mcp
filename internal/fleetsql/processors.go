@@ -32,7 +32,7 @@ func FlattenProcessors(processors []*fleetpkg.Processor, basePath string) ([]Fla
 		}
 
 		// Compute JSON Pointer for this processor
-		jsonPointer := fmt.Sprintf("%s/%d", basePath, i)
+		jsonPointer := fmt.Sprintf("%s/%d/%s", basePath, i, p.Type)
 
 		// Create a copy of attributes and add on_failure if present
 		attrs := make(map[string]any)
