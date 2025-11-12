@@ -315,6 +315,21 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 				}
 			}
 		}
+
+		// Data stream ingest pipelines.
+		for name, pipeline := range ds.Pipelines {
+			_, err = q.InsertIngestPipeline(ctx, database.InsertIngestPipelineParams{
+				DataStreamID: dsID,
+				Name:         sqlStringEmtpyIsNull(name),
+				Description:  sqlStringEmtpyIsNull(pipeline.Description),
+				Version:      sqlNullInt64(pipeline.Version),
+				Meta:         jsonNullString(pipeline.Meta),
+				FilePath:     pipeline.Path(),
+			})
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	// Integration transforms.
