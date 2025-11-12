@@ -584,6 +584,24 @@ func (q *Queries) InsertPolicyTemplateVar(ctx context.Context, arg InsertPolicyT
 	return err
 }
 
+const insertSampleEvent = `-- name: InsertSampleEvent :one
+INSERT INTO sample_events (data_stream_id, event, file_path)
+VALUES (?, ?, ?) RETURNING id
+`
+
+type InsertSampleEventParams struct {
+	DataStreamID int64
+	Event        sql.NullString
+	FilePath     string
+}
+
+func (q *Queries) InsertSampleEvent(ctx context.Context, arg InsertSampleEventParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertSampleEvent, arg.DataStreamID, arg.Event, arg.FilePath)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertStream = `-- name: InsertStream :one
 INSERT INTO streams (data_stream_id, input, description, title, template_path,
                      enabled)
