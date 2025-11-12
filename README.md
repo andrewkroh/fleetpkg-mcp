@@ -6,6 +6,9 @@ It loads metadata from a local copy of the `elastic/integrations` repository
 into a SQLite database and exposes SQL query capabilities to the LLM through the
 Model Context Protocol.
 
+Each time the MCP is started, it will rebuild the database. This takes about 10
+seconds on a fast machine.
+
 ## Features
 
 - Scans and indexes all Elastic Fleet integration packages from your local `elastic/integrations` repository
@@ -25,7 +28,7 @@ Model Context Protocol.
       "args": [
         "run",
         "github.com/andrewkroh/fleetpkg-mcp@main",
-        "-dir"
+        "-dir",
         "/Users/<USERNAME>/code/elastic/integrations"
       ]
     }
@@ -47,7 +50,7 @@ then determine the path using `which fleetpkg-mcp`.
     "fleetpkg": {
       "command": "/Users/<USERNAME>/go/bin/fleetpkg-mcp",
       "args": [
-        "-dir"
+        "-dir",
         "/Users/<USERNAME>/code/elastic/integrations"
       ]
     }
@@ -157,6 +160,57 @@ Here's an example of how you can use this server with an LLM to answer questions
 > - network_traffic > sip
 > - network_traffic > thrift
 > - network_traffic > tls
+
+----
+
+> **Q**: Analyze the screenshots to determine the percentage of screenshots that
+> have the correct 'size' column in comparison to the computed width and height
+> column values. Include the total numbers as well.
+>
+> *A*: Based on my analysis of the screenshots in the database, here are the results:
+>
+> Summary Statistics
+>
+> - Total screenshots: 932
+> - Correct size values: 169 (18.13%)
+> - Incorrect size values: 763 (81.87%)
+> 
+> Analysis
+> 
+> Only 18.13% of screenshots have the correct 'size' column value that matches the computed dimensions from the width and height columns. This means that 81.87% of the screenshots have mismatched or incorrect size specifications.
+> 
+> Common Issues Found
+> 
+> Looking at the sample data, I can see several types of mismatches:
+> 
+> 1. Placeholder values: Many screenshots have size="600x600" when the actual dimensions are different (e.g., 1920x1080, 1899x2069, 1920x1233)
+> 2. Scaled/resized values: Screenshots show evidence of being resized - the size column contains smaller dimensions than the actual image dimensions (e.g., size shows 1896x961 but actual is 2880x1800)
+> 3. Character encoding issues: At least one case shows size="1608×2692" (using × instead of x) while computed is "1608x2692"
+> 4. Minor width discrepancies: Some have small differences in width (e.g., size="1280x1329" vs computed "1268x1329")
+
+----
+
+> **Q**: Use the fleetpkg MCP tool. Analyze the number of 'set' ingest
+> processors that use the 'copy_from' attribute vs the 'value' attribute with a
+> Mustache template value matching '{{%}}'
+>
+> **A**:
+> Here are the results of the analysis of 'set' ingest processors:
+> - Number of processors using the `copy_from` attribute: 6992
+> - Number of processors using the `value` attribute with a Mustache template:
+    1174
+>
+> **Q**: What are the top 5 teams responsible for the packages using 'set' with
+> a Mustache template instead of 'copy_from'?
+> 
+> **A**:
+> Here are the top 5 teams using 'set' with a Mustache template instead of 'copy_from':
+>
+> 1. elastic/security-service-integrations: 395 uses
+> 2. elastic/integration-experience: 321 uses
+> 3. elastic/obs-infraobs-integrations: 245 uses
+> 4. elastic/obs-ds-hosted-services: 100 uses
+> 5. elastic/elastic-agent-data-plane: 36 uses
 
 ## License
 
