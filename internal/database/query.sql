@@ -128,3 +128,11 @@ INSERT INTO transforms (integration_id, name, transform_source_index,
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?) RETURNING id;
 
+-- name: InsertIntegrationCategory :exec
+INSERT INTO integration_categories (integration_id, category)
+VALUES (?, ?);
+
+-- name: InsertPolicyTemplateCategory :exec
+INSERT INTO policy_template_categories (policy_template_id, category)
+VALUES (?, ?);
+

@@ -137,8 +137,8 @@ type Integration struct {
 }
 
 type IntegrationCategory struct {
-	IntegrationID sql.NullInt64
-	Category      sql.NullString
+	IntegrationID int64
+	Category      string
 }
 
 type IntegrationIcon struct {
@@ -187,8 +187,8 @@ type PolicyTemplate struct {
 }
 
 type PolicyTemplateCategory struct {
-	PolicyTemplateID sql.NullInt64
-	Category         sql.NullString
+	PolicyTemplateID int64
+	Category         string
 }
 
 type PolicyTemplateDataStream struct {

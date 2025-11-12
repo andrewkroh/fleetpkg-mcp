@@ -73,6 +73,17 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 		return err
 	}
 
+	// Integration categories.
+	for _, cat := range in.Manifest.Categories {
+		err = q.InsertIntegrationCategory(ctx, database.InsertIntegrationCategoryParams{
+			IntegrationID: integID,
+			Category:      cat,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	// Integration top-level variables.
 	for _, v := range in.Manifest.Vars {
 		varID, err := insertVar(ctx, q, &v)
@@ -94,6 +105,17 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 		ptID, err := insertPolicyTemplate(ctx, q, integID, &pt)
 		if err != nil {
 			return err
+		}
+
+		// Policy template categories.
+		for _, cat := range pt.Categories {
+			err = q.InsertPolicyTemplateCategory(ctx, database.InsertPolicyTemplateCategoryParams{
+				PolicyTemplateID: ptID,
+				Category:         cat,
+			})
+			if err != nil {
+				return err
+			}
 		}
 
 		// Policy template variables.
