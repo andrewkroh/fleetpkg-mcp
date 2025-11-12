@@ -145,16 +145,16 @@ INSERT INTO integration_icons (integration_id, src, title, size, type, dark_mode
 VALUES (?, ?, ?, ?, ?, ?) RETURNING id;
 
 -- name: InsertIntegrationScreenshot :one
-INSERT INTO integration_screenshots (integration_id, src, title, size, type)
-VALUES (?, ?, ?, ?, ?) RETURNING id;
+INSERT INTO integration_screenshots (integration_id, src, title, size, type, width, height, byte_size)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id;
 
 -- name: InsertPolicyTemplateIcon :one
 INSERT INTO policy_template_icons (policy_template_id, src, title, size, type, dark_mode)
 VALUES (?, ?, ?, ?, ?, ?) RETURNING id;
 
 -- name: InsertPolicyTemplateScreenshot :one
-INSERT INTO policy_template_screenshots (policy_template_id, src, title, size, type)
-VALUES (?, ?, ?, ?, ?) RETURNING id;
+INSERT INTO policy_template_screenshots (policy_template_id, src, title, size, type, width, height, byte_size)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id;
 
 -- name: InsertVarOption :one
 INSERT INTO var_options (var_id, value, text)

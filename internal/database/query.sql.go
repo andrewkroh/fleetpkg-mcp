@@ -429,8 +429,8 @@ func (q *Queries) InsertIntegrationIcon(ctx context.Context, arg InsertIntegrati
 }
 
 const insertIntegrationScreenshot = `-- name: InsertIntegrationScreenshot :one
-INSERT INTO integration_screenshots (integration_id, src, title, size, type)
-VALUES (?, ?, ?, ?, ?) RETURNING id
+INSERT INTO integration_screenshots (integration_id, src, title, size, type, width, height, byte_size)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 `
 
 type InsertIntegrationScreenshotParams struct {
@@ -439,6 +439,9 @@ type InsertIntegrationScreenshotParams struct {
 	Title         sql.NullString
 	Size          sql.NullString
 	Type          sql.NullString
+	Width         sql.NullInt64
+	Height        sql.NullInt64
+	ByteSize      sql.NullInt64
 }
 
 func (q *Queries) InsertIntegrationScreenshot(ctx context.Context, arg InsertIntegrationScreenshotParams) (int64, error) {
@@ -448,6 +451,9 @@ func (q *Queries) InsertIntegrationScreenshot(ctx context.Context, arg InsertInt
 		arg.Title,
 		arg.Size,
 		arg.Type,
+		arg.Width,
+		arg.Height,
+		arg.ByteSize,
 	)
 	var id int64
 	err := row.Scan(&id)
@@ -625,8 +631,8 @@ func (q *Queries) InsertPolicyTemplateInputVars(ctx context.Context, arg InsertP
 }
 
 const insertPolicyTemplateScreenshot = `-- name: InsertPolicyTemplateScreenshot :one
-INSERT INTO policy_template_screenshots (policy_template_id, src, title, size, type)
-VALUES (?, ?, ?, ?, ?) RETURNING id
+INSERT INTO policy_template_screenshots (policy_template_id, src, title, size, type, width, height, byte_size)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
 `
 
 type InsertPolicyTemplateScreenshotParams struct {
@@ -635,6 +641,9 @@ type InsertPolicyTemplateScreenshotParams struct {
 	Title            sql.NullString
 	Size             sql.NullString
 	Type             sql.NullString
+	Width            sql.NullInt64
+	Height           sql.NullInt64
+	ByteSize         sql.NullInt64
 }
 
 func (q *Queries) InsertPolicyTemplateScreenshot(ctx context.Context, arg InsertPolicyTemplateScreenshotParams) (int64, error) {
@@ -644,6 +653,9 @@ func (q *Queries) InsertPolicyTemplateScreenshot(ctx context.Context, arg Insert
 		arg.Title,
 		arg.Size,
 		arg.Type,
+		arg.Width,
+		arg.Height,
+		arg.ByteSize,
 	)
 	var id int64
 	err := row.Scan(&id)

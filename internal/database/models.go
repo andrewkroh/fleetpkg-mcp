@@ -169,6 +169,9 @@ type IntegrationScreenshot struct {
 	Src           sql.NullString
 	Title         sql.NullString
 	Size          sql.NullString
+	Width         sql.NullInt64
+	Height        sql.NullInt64
+	ByteSize      sql.NullInt64
 	Type          sql.NullString
 }
 
@@ -240,6 +243,9 @@ type PolicyTemplateScreenshot struct {
 	Src              sql.NullString
 	Title            sql.NullString
 	Size             sql.NullString
+	Width            sql.NullInt64
+	Height           sql.NullInt64
+	ByteSize         sql.NullInt64
 	Type             sql.NullString
 }
 

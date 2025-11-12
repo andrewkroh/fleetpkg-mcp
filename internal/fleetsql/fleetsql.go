@@ -103,12 +103,18 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 
 	// Integration screenshots.
 	for _, screenshot := range in.Manifest.Screenshots {
+		// Read image metadata from file
+		imgMeta := ReadImageMetadata(in.Path(), screenshot.Src)
+
 		_, err = q.InsertIntegrationScreenshot(ctx, database.InsertIntegrationScreenshotParams{
 			IntegrationID: integID,
 			Src:           sqlStringEmtpyIsNull(screenshot.Src),
 			Title:         sqlStringEmtpyIsNull(screenshot.Title),
 			Size:          sqlStringEmtpyIsNull(screenshot.Size),
 			Type:          sqlStringEmtpyIsNull(screenshot.Type),
+			Width:         sqlNullInt64FromInt(imgMeta.Width),
+			Height:        sqlNullInt64FromInt(imgMeta.Height),
+			ByteSize:      sqlNullInt64FromInt64(imgMeta.ByteSize),
 		})
 		if err != nil {
 			return err
@@ -203,12 +209,18 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 
 		// Policy template screenshots.
 		for _, screenshot := range pt.Screenshots {
+			// Read image metadata from file
+			imgMeta := ReadImageMetadata(in.Path(), screenshot.Src)
+
 			_, err = q.InsertPolicyTemplateScreenshot(ctx, database.InsertPolicyTemplateScreenshotParams{
 				PolicyTemplateID: ptID,
 				Src:              sqlStringEmtpyIsNull(screenshot.Src),
 				Title:            sqlStringEmtpyIsNull(screenshot.Title),
 				Size:             sqlStringEmtpyIsNull(screenshot.Size),
 				Type:             sqlStringEmtpyIsNull(screenshot.Type),
+				Width:            sqlNullInt64FromInt(imgMeta.Width),
+				Height:           sqlNullInt64FromInt(imgMeta.Height),
+				ByteSize:         sqlNullInt64FromInt64(imgMeta.ByteSize),
 			})
 			if err != nil {
 				return err

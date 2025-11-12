@@ -269,7 +269,10 @@ CREATE TABLE IF NOT EXISTS integration_screenshots (
     integration_id INTEGER NOT NULL, -- foreign key to integrations table
     src TEXT, -- source path of the screenshot
     title TEXT, -- title of the screenshot
-    size TEXT, -- size specification
+    size TEXT, -- size specification as width and height in pixels formatted as "WxH"
+    width INTEGER, -- width in pixels computed from the file
+    height INTEGER, -- height in pixels computed from the file
+    byte_size INTEGER, -- size in bytes
     type TEXT, -- MIME type of the screenshot
     FOREIGN KEY (integration_id) REFERENCES integrations(id)
 );`
@@ -292,7 +295,10 @@ CREATE TABLE IF NOT EXISTS policy_template_screenshots (
     policy_template_id INTEGER NOT NULL, -- foreign key to policy_templates table
     src TEXT, -- source path of the screenshot
     title TEXT, -- title of the screenshot
-    size TEXT, -- size specification
+    size TEXT, -- size specification as width and height in pixels formatted as "WxH"
+    width INTEGER, -- width in pixels computed from the file
+    height INTEGER, -- height in pixels computed from the file
+    byte_size INTEGER, -- size in bytes
     type TEXT, -- MIME type of the screenshot
     FOREIGN KEY (policy_template_id) REFERENCES policy_templates(id)
 );`
