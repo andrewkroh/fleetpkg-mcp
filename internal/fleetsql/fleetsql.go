@@ -373,6 +373,18 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 			}
 		}
 	}
+
+	// Integration changelog.
+	if in.Changelog.Path() != "" {
+		_, err = q.InsertChangelog(ctx, database.InsertChangelogParams{
+			IntegrationID: integID,
+			FilePath:      in.Changelog.Path(),
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
