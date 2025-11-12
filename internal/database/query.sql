@@ -168,3 +168,8 @@ VALUES (?, ?) RETURNING id;
 INSERT INTO build_manifests (integration_id, dependencies_ecs_reference,
                               dependencies_ecs_import_mappings, file_path)
 VALUES (?, ?, ?, ?) RETURNING id;
+
+-- name: InsertIngestPipeline :one
+INSERT INTO ingest_pipelines (data_stream_id, name, description, version, meta,
+                               file_path)
+VALUES (?, ?, ?, ?, ?, ?) RETURNING id;

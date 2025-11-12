@@ -214,6 +214,35 @@ func (q *Queries) InsertField(ctx context.Context, arg InsertFieldParams) (int64
 	return id, err
 }
 
+const insertIngestPipeline = `-- name: InsertIngestPipeline :one
+INSERT INTO ingest_pipelines (data_stream_id, name, description, version, meta,
+                               file_path)
+VALUES (?, ?, ?, ?, ?, ?) RETURNING id
+`
+
+type InsertIngestPipelineParams struct {
+	DataStreamID int64
+	Name         sql.NullString
+	Description  sql.NullString
+	Version      sql.NullInt64
+	Meta         sql.NullString
+	FilePath     string
+}
+
+func (q *Queries) InsertIngestPipeline(ctx context.Context, arg InsertIngestPipelineParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertIngestPipeline,
+		arg.DataStreamID,
+		arg.Name,
+		arg.Description,
+		arg.Version,
+		arg.Meta,
+		arg.FilePath,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertIntegration = `-- name: InsertIntegration :one
 INSERT INTO integrations (name, dir_name, title, version, description, type,
                           format_version, license, release,
