@@ -819,6 +819,24 @@ func (q *Queries) InsertTransform(ctx context.Context, arg InsertTransformParams
 	return id, err
 }
 
+const insertTransformDestAlias = `-- name: InsertTransformDestAlias :one
+INSERT INTO transform_dest_aliases (transform_id, alias, move_on_creation)
+VALUES (?, ?, ?) RETURNING id
+`
+
+type InsertTransformDestAliasParams struct {
+	TransformID    int64
+	Alias          sql.NullString
+	MoveOnCreation sql.NullBool
+}
+
+func (q *Queries) InsertTransformDestAlias(ctx context.Context, arg InsertTransformDestAliasParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertTransformDestAlias, arg.TransformID, arg.Alias, arg.MoveOnCreation)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertTransformField = `-- name: InsertTransformField :exec
 INSERT INTO transform_fields (transform_id, field_id)
 VALUES (?, ?)

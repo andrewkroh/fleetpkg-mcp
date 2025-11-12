@@ -190,3 +190,7 @@ VALUES (?, ?, ?, ?, ?) RETURNING id;
 INSERT INTO changes (release_id, description, type, link, file_path,
                      line_number, col)
 VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id;
+
+-- name: InsertTransformDestAlias :one
+INSERT INTO transform_dest_aliases (transform_id, alias, move_on_creation)
+VALUES (?, ?, ?) RETURNING id;
