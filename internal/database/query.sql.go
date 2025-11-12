@@ -39,6 +39,23 @@ func (q *Queries) InsertBuildManifest(ctx context.Context, arg InsertBuildManife
 	return id, err
 }
 
+const insertChangelog = `-- name: InsertChangelog :one
+INSERT INTO changelogs (integration_id, file_path)
+VALUES (?, ?) RETURNING id
+`
+
+type InsertChangelogParams struct {
+	IntegrationID int64
+	FilePath      string
+}
+
+func (q *Queries) InsertChangelog(ctx context.Context, arg InsertChangelogParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertChangelog, arg.IntegrationID, arg.FilePath)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertDataStream = `-- name: InsertDataStream :one
 INSERT INTO data_streams (integration_id, name, dataset, dataset_is_prefix,
                           ilm_policy, release, title, type,

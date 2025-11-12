@@ -177,3 +177,7 @@ VALUES (?, ?, ?, ?, ?, ?) RETURNING id;
 -- name: InsertSampleEvent :one
 INSERT INTO sample_events (data_stream_id, event, file_path)
 VALUES (?, ?, ?) RETURNING id;
+
+-- name: InsertChangelog :one
+INSERT INTO changelogs (integration_id, file_path)
+VALUES (?, ?) RETURNING id;
