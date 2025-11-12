@@ -233,6 +233,21 @@ func (q *Queries) InsertIntegration(ctx context.Context, arg InsertIntegrationPa
 	return id, err
 }
 
+const insertIntegrationCategory = `-- name: InsertIntegrationCategory :exec
+INSERT INTO integration_categories (integration_id, category)
+VALUES (?, ?)
+`
+
+type InsertIntegrationCategoryParams struct {
+	IntegrationID int64
+	Category      string
+}
+
+func (q *Queries) InsertIntegrationCategory(ctx context.Context, arg InsertIntegrationCategoryParams) error {
+	_, err := q.db.ExecContext(ctx, insertIntegrationCategory, arg.IntegrationID, arg.Category)
+	return err
+}
+
 const insertIntegrationVar = `-- name: InsertIntegrationVar :exec
 INSERT INTO integration_vars (integration_id, var_id)
 VALUES (?, ?)
@@ -296,6 +311,21 @@ func (q *Queries) InsertPolicyTemplate(ctx context.Context, arg InsertPolicyTemp
 	var id int64
 	err := row.Scan(&id)
 	return id, err
+}
+
+const insertPolicyTemplateCategory = `-- name: InsertPolicyTemplateCategory :exec
+INSERT INTO policy_template_categories (policy_template_id, category)
+VALUES (?, ?)
+`
+
+type InsertPolicyTemplateCategoryParams struct {
+	PolicyTemplateID int64
+	Category         string
+}
+
+func (q *Queries) InsertPolicyTemplateCategory(ctx context.Context, arg InsertPolicyTemplateCategoryParams) error {
+	_, err := q.db.ExecContext(ctx, insertPolicyTemplateCategory, arg.PolicyTemplateID, arg.Category)
+	return err
 }
 
 const insertPolicyTemplateInput = `-- name: InsertPolicyTemplateInput :one

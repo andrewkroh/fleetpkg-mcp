@@ -223,8 +223,8 @@ CREATE TABLE IF NOT EXISTS policy_template_inputs (
 
 -- Categories associated with policy templates. Join table for many-to-many relationship.
 CREATE TABLE IF NOT EXISTS policy_template_categories (
-    policy_template_id INTEGER, -- foreign key to policy_templates table
-    category TEXT, -- category name
+    policy_template_id INTEGER NOT NULL, -- foreign key to policy_templates table
+    category TEXT NOT NULL, -- category name
     PRIMARY KEY (policy_template_id, category),
     FOREIGN KEY (policy_template_id) REFERENCES policy_templates(id)
 );
@@ -239,8 +239,8 @@ CREATE TABLE IF NOT EXISTS policy_template_data_streams (
 
 -- Categories associated with integrations. Join table for many-to-many relationship.
 CREATE TABLE IF NOT EXISTS integration_categories (
-    integration_id INTEGER, -- foreign key to integrations table
-    category TEXT, -- category name
+    integration_id INTEGER NOT NULL, -- foreign key to integrations table
+    category TEXT NOT NULL, -- category name
     PRIMARY KEY (integration_id, category),
     FOREIGN KEY (integration_id) REFERENCES integrations(id)
 );
