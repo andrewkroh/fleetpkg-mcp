@@ -181,3 +181,12 @@ VALUES (?, ?, ?) RETURNING id;
 -- name: InsertChangelog :one
 INSERT INTO changelogs (integration_id, file_path)
 VALUES (?, ?) RETURNING id;
+
+-- name: InsertRelease :one
+INSERT INTO releases (changelog_id, version, file_path, line_number, col)
+VALUES (?, ?, ?, ?, ?) RETURNING id;
+
+-- name: InsertChange :one
+INSERT INTO changes (release_id, description, type, link, file_path,
+                     line_number, col)
+VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id;

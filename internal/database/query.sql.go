@@ -39,6 +39,37 @@ func (q *Queries) InsertBuildManifest(ctx context.Context, arg InsertBuildManife
 	return id, err
 }
 
+const insertChange = `-- name: InsertChange :one
+INSERT INTO changes (release_id, description, type, link, file_path,
+                     line_number, col)
+VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
+`
+
+type InsertChangeParams struct {
+	ReleaseID   int64
+	Description sql.NullString
+	Type        sql.NullString
+	Link        sql.NullString
+	FilePath    string
+	LineNumber  sql.NullInt64
+	Col         sql.NullInt64
+}
+
+func (q *Queries) InsertChange(ctx context.Context, arg InsertChangeParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertChange,
+		arg.ReleaseID,
+		arg.Description,
+		arg.Type,
+		arg.Link,
+		arg.FilePath,
+		arg.LineNumber,
+		arg.Col,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertChangelog = `-- name: InsertChangelog :one
 INSERT INTO changelogs (integration_id, file_path)
 VALUES (?, ?) RETURNING id
@@ -599,6 +630,32 @@ type InsertPolicyTemplateVarParams struct {
 func (q *Queries) InsertPolicyTemplateVar(ctx context.Context, arg InsertPolicyTemplateVarParams) error {
 	_, err := q.db.ExecContext(ctx, insertPolicyTemplateVar, arg.PolicyTemplateID, arg.VarID)
 	return err
+}
+
+const insertRelease = `-- name: InsertRelease :one
+INSERT INTO releases (changelog_id, version, file_path, line_number, col)
+VALUES (?, ?, ?, ?, ?) RETURNING id
+`
+
+type InsertReleaseParams struct {
+	ChangelogID int64
+	Version     sql.NullString
+	FilePath    string
+	LineNumber  sql.NullInt64
+	Col         sql.NullInt64
+}
+
+func (q *Queries) InsertRelease(ctx context.Context, arg InsertReleaseParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertRelease,
+		arg.ChangelogID,
+		arg.Version,
+		arg.FilePath,
+		arg.LineNumber,
+		arg.Col,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const insertSampleEvent = `-- name: InsertSampleEvent :one
