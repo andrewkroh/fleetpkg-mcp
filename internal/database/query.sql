@@ -155,3 +155,7 @@ VALUES (?, ?, ?, ?, ?, ?) RETURNING id;
 -- name: InsertPolicyTemplateScreenshot :one
 INSERT INTO policy_template_screenshots (policy_template_id, src, title, size, type)
 VALUES (?, ?, ?, ?, ?) RETURNING id;
+
+-- name: InsertVarOption :one
+INSERT INTO var_options (var_id, value, text)
+VALUES (?, ?, ?) RETURNING id;

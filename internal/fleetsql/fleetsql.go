@@ -458,6 +458,19 @@ func insertVar(ctx context.Context, q *database.Queries, v *fleetpkg.Var) (int64
 	if err != nil {
 		return 0, err
 	}
+
+	// Var options.
+	for _, opt := range v.Options {
+		_, err = q.InsertVarOption(ctx, database.InsertVarOptionParams{
+			VarID: id,
+			Value: sqlStringEmtpyIsNull(opt.Value),
+			Text:  sqlStringEmtpyIsNull(opt.Text),
+		})
+		if err != nil {
+			return 0, err
+		}
+	}
+
 	return id, nil
 }
 
