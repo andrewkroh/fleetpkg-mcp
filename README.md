@@ -16,11 +16,97 @@ seconds on a fast machine.
 - Exposes readonly database access to LLMs through the Model Context Protocol
 - Enables AI assistants to answer detailed questions about Elastic Fleet integrations
 
-## Usage
+## Installation
 
-### With `go run`
+### Install from source
 
+```bash
+go install github.com/andrewkroh/fleetpkg-mcp@latest
 ```
+
+This will install the binary to your `$GOPATH/bin` directory (typically `~/go/bin`).
+
+### Run without installing
+
+You can also run the server directly without installing:
+
+```bash
+go run github.com/andrewkroh/fleetpkg-mcp@main -dir /path/to/integrations
+```
+
+## MCP Server Setup
+
+The `fleetpkg-mcp` server can be configured as an MCP server in your AI
+assistant. The server requires the `-dir` argument pointing to your local
+checkout of the [elastic/integrations](https://github.com/elastic/integrations)
+repository.
+
+### Claude Desktop Setup
+
+#### Using stdio transport (recommended)
+
+Add the server using the Claude CLI:
+
+```bash
+claude mcp add --scope user fleetpkg -- /Users/<USERNAME>/go/bin/fleetpkg-mcp -dir /path/to/integrations
+```
+
+Or manually add to your Claude Desktop configuration file:
+
+```json
+{
+  "mcpServers": {
+    "fleetpkg": {
+      "command": "/Users/<USERNAME>/go/bin/fleetpkg-mcp",
+      "args": [
+        "-dir",
+        "/path/to/integrations"
+      ]
+    }
+  }
+}
+```
+
+To remove:
+
+```bash
+claude mcp remove fleetpkg
+```
+
+#### Using HTTP transport
+
+First, start the server in HTTP mode:
+
+```bash
+fleetpkg-mcp -dir /path/to/integrations -http 127.0.0.1:1234
+```
+
+Then add the HTTP endpoint to Claude Desktop:
+
+```bash
+claude mcp add --scope user --transport http fleetpkg http://127.0.0.1:1234
+```
+
+### Other MCP Clients
+
+For other MCP-compatible clients, use one of these configuration formats:
+
+#### With installed binary
+
+```json
+{
+  "mcpServers": {
+    "fleetpkg": {
+      "command": "/path/to/fleetpkg-mcp",
+      "args": ["-dir", "/path/to/integrations"]
+    }
+  }
+}
+```
+
+#### With go run
+
+```json
 {
   "mcpServers": {
     "fleetpkg": {
@@ -29,64 +115,46 @@ seconds on a fast machine.
         "run",
         "github.com/andrewkroh/fleetpkg-mcp@main",
         "-dir",
-        "/Users/<USERNAME>/code/elastic/integrations"
+        "/path/to/integrations"
       ]
     }
   }
 }
 ```
 
-### Local install
+## CLI Usage
 
-Install the binary with
+The server can be run directly from the command line for testing or HTTP mode:
 
-`go install github.com/andrewkroh/fleetpkg-mcp`
+```bash
+# Basic usage with stdio (for MCP)
+fleetpkg-mcp -dir /path/to/integrations
 
-then determine the path using `which fleetpkg-mcp`.
+# HTTP mode (for HTTP-based MCP clients)
+fleetpkg-mcp -dir /path/to/integrations -http 127.0.0.1:1234
 
+# With custom log level
+fleetpkg-mcp -dir /path/to/integrations -log-level debug
+
+# Disable logging
+fleetpkg-mcp -dir /path/to/integrations -no-log
+
+# Show version
+fleetpkg-mcp -version
 ```
-{
-  "mcpServers": {
-    "fleetpkg": {
-      "command": "/Users/<USERNAME>/go/bin/fleetpkg-mcp",
-      "args": [
-        "-dir",
-        "/Users/<USERNAME>/code/elastic/integrations"
-      ]
-    }
-  }
-}
-```
 
-### Claude setup with stdio
+### Arguments
 
-Add:
+#### Required
 
-`claude mcp add --scope user fleetpkg -- /Users/<USERNAME>/go/bin/fleetpkg-mcp -dir /Users/akroh/code/elastic/integrations`
+- `-dir <path>`: Path to your local checkout of the [elastic/integrations](https://github.com/elastic/integrations) repository.
 
-Removal:
+#### Optional
 
-`claude mcp remove fleetpkg`
-
-### Claude setup with http
-
-Add:
-
-`claude mcp add --scope user --transport http fleetpkg http://127.0.0.1:1234`
-
-Removal:
-
-`claude mcp remove fleetpkg`
-
-### Required Arguments
-
-- `-dir`: **Required**. Path to your local checkout of the [elastic/integrations](https://github.com/elastic/integrations) repository.
-
-### Optional Arguments
-
-- `-http`: Listen for HTTP at the specified address, instead of using stdin/stdout
-- `-log-level`: Set log level (debug, info, warn, error). Default: info
-- `-no-log`: Disable logging
+- `-http <address>`: Listen for HTTP connections at the specified address instead of using stdin/stdout. Example: `127.0.0.1:1234`
+- `-log-level <level>`: Set log level. Options: `debug`, `info`, `warn`, `error`. Default: `info`
+- `-no-log`: Disable all logging output
+- `-version`: Print version information and exit
 
 ## Database Schema
 
