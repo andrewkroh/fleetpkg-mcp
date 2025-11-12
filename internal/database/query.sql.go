@@ -14,6 +14,31 @@ import (
 	"database/sql"
 )
 
+const insertBuildManifest = `-- name: InsertBuildManifest :one
+INSERT INTO build_manifests (integration_id, dependencies_ecs_reference,
+                              dependencies_ecs_import_mappings, file_path)
+VALUES (?, ?, ?, ?) RETURNING id
+`
+
+type InsertBuildManifestParams struct {
+	IntegrationID                 int64
+	DependenciesEcsReference      sql.NullString
+	DependenciesEcsImportMappings sql.NullBool
+	FilePath                      string
+}
+
+func (q *Queries) InsertBuildManifest(ctx context.Context, arg InsertBuildManifestParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertBuildManifest,
+		arg.IntegrationID,
+		arg.DependenciesEcsReference,
+		arg.DependenciesEcsImportMappings,
+		arg.FilePath,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertDataStream = `-- name: InsertDataStream :one
 INSERT INTO data_streams (integration_id, name, dataset, dataset_is_prefix,
                           ilm_policy, release, title, type,

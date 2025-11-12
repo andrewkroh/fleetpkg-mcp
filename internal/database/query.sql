@@ -163,3 +163,8 @@ VALUES (?, ?, ?) RETURNING id;
 -- name: InsertDiscoveryField :one
 INSERT INTO discovery_fields (integration_id, name)
 VALUES (?, ?) RETURNING id;
+
+-- name: InsertBuildManifest :one
+INSERT INTO build_manifests (integration_id, dependencies_ecs_reference,
+                              dependencies_ecs_import_mappings, file_path)
+VALUES (?, ?, ?, ?) RETURNING id;

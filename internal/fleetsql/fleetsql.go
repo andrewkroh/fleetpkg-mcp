@@ -126,6 +126,19 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 		}
 	}
 
+	// Build manifest.
+	if in.Build != nil {
+		_, err = q.InsertBuildManifest(ctx, database.InsertBuildManifestParams{
+			IntegrationID:                 integID,
+			DependenciesEcsReference:      sqlStringEmtpyIsNull(in.Build.Dependencies.ECS.Reference),
+			DependenciesEcsImportMappings: sqlNullBool(in.Build.Dependencies.ECS.ImportMappings),
+			FilePath:                      in.Build.Path(),
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	// Integration top-level variables.
 	for _, v := range in.Manifest.Vars {
 		varID, err := insertVar(ctx, q, &v)
