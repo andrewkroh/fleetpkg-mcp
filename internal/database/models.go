@@ -193,7 +193,7 @@ type PolicyTemplateCategory struct {
 
 type PolicyTemplateDataStream struct {
 	PolicyTemplateID int64
-	DataStreamName   sql.NullString
+	DataStreamName   string
 }
 
 type PolicyTemplateIcon struct {

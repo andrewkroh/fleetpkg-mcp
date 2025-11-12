@@ -118,6 +118,17 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 			}
 		}
 
+		// Policy template data streams.
+		for _, dsName := range pt.DataStreams {
+			err = q.InsertPolicyTemplateDataStream(ctx, database.InsertPolicyTemplateDataStreamParams{
+				PolicyTemplateID: ptID,
+				DataStreamName:   dsName,
+			})
+			if err != nil {
+				return err
+			}
+		}
+
 		// Policy template variables.
 		for _, v := range pt.Vars {
 			varID, err := insertVar(ctx, q, &v)
