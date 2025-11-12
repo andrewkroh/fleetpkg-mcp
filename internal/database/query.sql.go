@@ -724,3 +724,21 @@ func (q *Queries) InsertVar(ctx context.Context, arg InsertVarParams) (int64, er
 	err := row.Scan(&id)
 	return id, err
 }
+
+const insertVarOption = `-- name: InsertVarOption :one
+INSERT INTO var_options (var_id, value, text)
+VALUES (?, ?, ?) RETURNING id
+`
+
+type InsertVarOptionParams struct {
+	VarID int64
+	Value sql.NullString
+	Text  sql.NullString
+}
+
+func (q *Queries) InsertVarOption(ctx context.Context, arg InsertVarOptionParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertVarOption, arg.VarID, arg.Value, arg.Text)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
