@@ -12,7 +12,9 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"strings"
 
+	"github.com/andrewkroh/go-ecs"
 	"github.com/andrewkroh/go-fleetpkg"
 
 	"github.com/andrewkroh/fleetpkg-mcp/internal/database"
@@ -298,9 +300,12 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 				return err
 			}
 			for _, f := range flat {
-				// TODO: Resolve external: ecs references.
+				var externalDef *ecs.Field
+				if f.External == "ecs" && in.Build != nil && in.Build.Dependencies.ECS.Reference != "" {
+					externalDef, _ = ecs.Lookup(f.Name, strings.TrimPrefix(in.Build.Dependencies.ECS.Reference, "git@"))
+				}
 
-				fieldID, err := insertField(ctx, q, &f)
+				fieldID, err := insertField(ctx, q, &f, externalDef)
 				if err != nil {
 					return err
 				}
@@ -409,9 +414,12 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 			return err
 		}
 		for _, f := range flat {
-			// TODO: Resolve external: ecs references.
+			var externalDef *ecs.Field
+			if f.External == "ecs" && in.Build != nil && in.Build.Dependencies.ECS.Reference != "" {
+				externalDef, _ = ecs.Lookup(f.Name, strings.TrimPrefix(in.Build.Dependencies.ECS.Reference, "git@"))
+			}
 
-			fieldID, err := insertField(ctx, q, &f)
+			fieldID, err := insertField(ctx, q, &f, externalDef)
 			if err != nil {
 				return err
 			}
@@ -621,7 +629,7 @@ func insertVar(ctx context.Context, q *database.Queries, v *fleetpkg.Var) (int64
 	return id, nil
 }
 
-func insertField(ctx context.Context, q *database.Queries, f *fleetpkg.Field) (int64, error) {
+func insertField(ctx context.Context, q *database.Queries, f *fleetpkg.Field, externalDef *ecs.Field) (int64, error) {
 	p := database.InsertFieldParams{
 		Name:            f.Name,
 		Type:            sqlStringEmtpyIsNull(f.Type),
@@ -651,6 +659,23 @@ func insertField(ctx context.Context, q *database.Queries, f *fleetpkg.Field) (i
 		FilePath:        f.Path(),
 		LineNumber:      int64(f.Line()),
 		Col:             int64(f.Column()),
+	}
+	// Merge in 'external: ecs' properties.
+	if externalDef != nil {
+		if !p.Type.Valid && externalDef.DataType != "" {
+			p.Type = sqlStringEmtpyIsNull(externalDef.DataType)
+		}
+		if !p.Pattern.Valid && externalDef.Pattern != "" {
+			p.Pattern = sqlStringEmtpyIsNull(externalDef.Pattern)
+		}
+		if !p.Normalizer.Valid && externalDef.Array {
+			p.Normalize = jsonNullString([]string{"array"})
+		}
+		if !p.Description.Valid && externalDef.Description != "" {
+			p.Description = sqlStringEmtpyIsNull(externalDef.Description)
+		}
+	} else if externalDef == nil && f.External == "ecs" {
+		p.Unresolvable = sql.NullInt64{Int64: 1, Valid: true}
 	}
 	id, err := q.InsertField(ctx, p)
 	if err != nil {

@@ -3,6 +3,7 @@ module github.com/andrewkroh/fleetpkg-mcp
 go 1.25.0
 
 require (
+	github.com/andrewkroh/go-ecs v0.0.0-20251111160023-db6307838a95
 	github.com/andrewkroh/go-fleetpkg v0.20.0
 	github.com/gorilla/handlers v1.5.2
 	github.com/modelcontextprotocol/go-sdk v1.1.0

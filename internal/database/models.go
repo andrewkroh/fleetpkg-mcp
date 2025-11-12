@@ -98,6 +98,7 @@ type Field struct {
 	MetricType      sql.NullString
 	Unit            sql.NullString
 	External        sql.NullString
+	Unresolvable    sql.NullInt64
 	YamlPath        sql.NullString
 	FilePath        string
 	LineNumber      int64

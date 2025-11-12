@@ -170,6 +170,7 @@ CREATE TABLE IF NOT EXISTS fields (
     metric_type TEXT, -- metric type for TSDB fields
     unit TEXT, -- unit of measurement for the field
     external TEXT, -- external definition source (possible values are 'ecs')
+    unresolvable INTEGER, -- boolean indicating that the external reference was unresolvable (such as referencing an ECS field that does not exist)
     yaml_path TEXT, -- YAML path to the field definition
     file_path TEXT NOT NULL, -- file path where the field is defined
     line_number INTEGER NOT NULL, -- line number in the file

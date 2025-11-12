@@ -189,10 +189,10 @@ INSERT INTO fields (name, type, description, value, example, pattern,
                     ignore_above, multi_fields, enabled, dynamic, indexed,
                     doc_values, copy_to, scaling_factor, alias_target_path,
                     normalize, normalizer, null_value,
-                    dimension, metric_type, external,
+                    dimension, metric_type, external, unresolvable,
                     yaml_path, file_path, line_number, col)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?) RETURNING id
+        ?, ?, ?, ?, ?) RETURNING id
 `
 
 type InsertFieldParams struct {
@@ -220,6 +220,7 @@ type InsertFieldParams struct {
 	Dimension       sql.NullBool
 	MetricType      sql.NullString
 	External        sql.NullString
+	Unresolvable    sql.NullInt64
 	YamlPath        sql.NullString
 	FilePath        string
 	LineNumber      int64
@@ -252,6 +253,7 @@ func (q *Queries) InsertField(ctx context.Context, arg InsertFieldParams) (int64
 		arg.Dimension,
 		arg.MetricType,
 		arg.External,
+		arg.Unresolvable,
 		arg.YamlPath,
 		arg.FilePath,
 		arg.LineNumber,

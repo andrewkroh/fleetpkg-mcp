@@ -88,10 +88,10 @@ INSERT INTO fields (name, type, description, value, example, pattern,
                     ignore_above, multi_fields, enabled, dynamic, indexed,
                     doc_values, copy_to, scaling_factor, alias_target_path,
                     normalize, normalizer, null_value,
-                    dimension, metric_type, external,
+                    dimension, metric_type, external, unresolvable,
                     yaml_path, file_path, line_number, col)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?) RETURNING id;
+        ?, ?, ?, ?, ?) RETURNING id;
 
 -- name: InsertDataStreamField :exec
 INSERT INTO data_stream_fields (data_stream_id, field_id, fields_file_name)
