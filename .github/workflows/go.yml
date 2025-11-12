@@ -41,7 +41,7 @@ jobs:
       - name: Test
         run: go test -v ./...
         env:
-          INTEGRATIONS_DIR: ./integrations
+          INTEGRATIONS_DIR: ${{ github.workspace }}/integrations
 
   govulncheck:
     runs-on: ubuntu-latest
