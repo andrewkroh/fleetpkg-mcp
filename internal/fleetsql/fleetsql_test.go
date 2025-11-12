@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/andrewkroh/go-fleetpkg"
 
@@ -25,6 +26,7 @@ func TestWritePackages(t *testing.T) {
 	}
 
 	// Read packages from disk.
+	start := time.Now()
 	pkgs, err := loadPackages(slog.Default(), integrationsDir)
 	if err != nil {
 		t.Fatal(err)
@@ -32,7 +34,7 @@ func TestWritePackages(t *testing.T) {
 	if len(pkgs) == 0 {
 		t.Fatal("no packages found")
 	}
-	t.Logf("Loaded %d packages", len(pkgs))
+	t.Logf("Loaded %d packages in %v", len(pkgs), time.Since(start))
 
 	// Open an in-memory database.
 	db, err := sql.Open("sqlite", ":memory:")
