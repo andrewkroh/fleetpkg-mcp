@@ -90,13 +90,21 @@ Removal:
 The SQLite database contains information about Fleet integrations including:
 
 - **Integrations**: Core metadata about each package (name, version, type, description, ownership)
-- **Policy Templates**: Configuration templates for deploying integrations
+- **Policy Templates**: Configuration templates for deploying integrations with deployment modes
 - **Data Streams**: Information about the data streams each integration produces
-- **Fields**: Detailed field definitions from fields.yml files
-- **Transforms**: Data transformation configurations
-- **Variables**: Configuration variables for customizing integrations
+- **Fields**: Detailed field definitions from fields.yml files with ECS mappings
+- **Transforms**: Data transformation configurations with pivot and latest operations
+- **Variables**: Configuration variables for customizing integrations with options for select types
+- **Ingest Pipelines**: Elasticsearch ingest pipeline configurations
+- **Ingest Processors**: Individual processors within pipelines including nested on_failure handlers
+- **Sample Events**: Example event data for data streams
+- **Icons and Screenshots**: Visual assets for integrations and policy templates with image metadata
+- **Discovery Fields**: Package discovery capability metadata
+- **Build Manifests**: Build configuration and ECS dependencies
+- **Changelogs**: Version history with releases and individual changes
+- **Categories**: Categorization for integrations and policy templates
 
-There is more data to expose, but this is an MVP.
+For the complete database schema, see [schema.sql](internal/database/schema.sql).
 
 ## Example Conversation
 
