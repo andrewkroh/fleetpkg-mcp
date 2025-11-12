@@ -276,6 +276,32 @@ func (q *Queries) InsertIntegrationIcon(ctx context.Context, arg InsertIntegrati
 	return id, err
 }
 
+const insertIntegrationScreenshot = `-- name: InsertIntegrationScreenshot :one
+INSERT INTO integration_screenshots (integration_id, src, title, size, type)
+VALUES (?, ?, ?, ?, ?) RETURNING id
+`
+
+type InsertIntegrationScreenshotParams struct {
+	IntegrationID int64
+	Src           sql.NullString
+	Title         sql.NullString
+	Size          sql.NullString
+	Type          sql.NullString
+}
+
+func (q *Queries) InsertIntegrationScreenshot(ctx context.Context, arg InsertIntegrationScreenshotParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertIntegrationScreenshot,
+		arg.IntegrationID,
+		arg.Src,
+		arg.Title,
+		arg.Size,
+		arg.Type,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertIntegrationVar = `-- name: InsertIntegrationVar :exec
 INSERT INTO integration_vars (integration_id, var_id)
 VALUES (?, ?)
