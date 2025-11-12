@@ -291,6 +291,37 @@ func (q *Queries) InsertIngestPipeline(ctx context.Context, arg InsertIngestPipe
 	return id, err
 }
 
+const insertIngestProcessor = `-- name: InsertIngestProcessor :one
+INSERT INTO ingest_processors (ingest_pipeline_id, type, attributes, json_pointer,
+                                file_path, line_number, col)
+VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id
+`
+
+type InsertIngestProcessorParams struct {
+	IngestPipelineID int64
+	Type             string
+	Attributes       interface{}
+	JsonPointer      string
+	FilePath         string
+	LineNumber       int64
+	Col              int64
+}
+
+func (q *Queries) InsertIngestProcessor(ctx context.Context, arg InsertIngestProcessorParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, insertIngestProcessor,
+		arg.IngestPipelineID,
+		arg.Type,
+		arg.Attributes,
+		arg.JsonPointer,
+		arg.FilePath,
+		arg.LineNumber,
+		arg.Col,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertIntegration = `-- name: InsertIntegration :one
 INSERT INTO integrations (name, dir_name, title, version, description, type,
                           format_version, license, release,

@@ -114,6 +114,17 @@ type IngestPipeline struct {
 	FilePath     string
 }
 
+type IngestProcessor struct {
+	ID               int64
+	IngestPipelineID int64
+	Type             string
+	Attributes       interface{}
+	JsonPointer      string
+	FilePath         string
+	LineNumber       int64
+	Col              int64
+}
+
 type Integration struct {
 	ID                             int64
 	Name                           string
