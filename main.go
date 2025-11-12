@@ -7,7 +7,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -18,6 +17,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime/debug"
+	"sync/atomic"
 
 	"github.com/andrewkroh/go-fleetpkg"
 	"github.com/gorilla/handlers"
@@ -57,7 +57,7 @@ func main() {
 	}
 }
 
-func run(integrationsDir string) (err error) {
+func run(integrationsDir string) error {
 	// Set up logging.
 	var logOutput io.Writer = os.Stderr
 	if *noLog {
@@ -73,46 +73,34 @@ func run(integrationsDir string) (err error) {
 	modVer, vcsRef := buildVersion()
 	log.Info("fleetpkg-mcp is starting...", slog.Any("version", modVer), slog.Any("vcs_ref", vcsRef))
 
-	// Read packages the integrations repo.
-	pkgs, err := loadPackages(log, integrationsDir)
-	if err != nil {
-		return fmt.Errorf("failed to load packages: %w", err)
-	}
-
-	// Create a new DB.
-	if err = os.Remove("fleetpkg.db"); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove existing database: %w", err)
-	}
-	db, err := sql.Open("sqlite", "file:fleetpkg.db")
-	if err != nil {
-		return fmt.Errorf("failed to open new database: %w", err)
-	}
-
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	if err = fleetsql.WritePackages(ctx, db, pkgs); err != nil {
-		return fmt.Errorf("failed to write packages to DB: %w", err)
-	}
-	if err = db.Close(); err != nil {
-		return fmt.Errorf("failed to close database: %w", err)
-	}
+	// Create atomic DB pointer for lazy initialization
+	dbPtr := &atomic.Pointer[sql.DB]{}
 
-	// Open the database as read-only.
-	db, err = sql.Open("sqlite", "file:fleetpkg.db?mode=ro")
-	if err != nil {
-		return fmt.Errorf("failed to open database readonly: %w", err)
-	}
-	defer func() {
-		err = errors.Join(err, db.Close())
-	}()
-
+	// Create MCP server immediately
 	s := mcp.NewServer(&mcp.Implementation{
 		Name:    "fleetpkg",
 		Title:   "Elastic Fleet Integration Package metadata MCP server",
 		Version: modVer + " (" + vcsRef + ")",
 	}, nil)
-	fleetmcp.AddTools(s, fleetsql.TableSchemas(), db, log)
+	fleetmcp.AddTools(s, fleetsql.TableSchemas(), dbPtr, log)
+
+	// Start initialization in background
+	initErrCh := make(chan error, 1)
+	go func() {
+		log.Info("Starting database initialization...")
+		db, err := initializeDatabase(ctx, log, integrationsDir)
+		if err != nil {
+			log.Error("Database initialization failed", "error", err)
+			initErrCh <- err
+			return
+		}
+		dbPtr.Store(db)
+		log.Info("Database initialization completed")
+		close(initErrCh)
+	}()
 
 	// Listen over HTTP.
 	if *httpAddr != "" {
@@ -133,18 +121,54 @@ func run(integrationsDir string) (err error) {
 		if !*noLog {
 			handler = handlers.CombinedLoggingHandler(os.Stdout, handler)
 		}
-		if err := http.Serve(listener, handler); err != nil {
+
+		// Serve HTTP in goroutine
+		serveDone := make(chan error, 1)
+		go func() {
+			serveDone <- http.Serve(listener, handler)
+		}()
+
+		// Wait for context cancellation, init error, or serve error
+		select {
+		case <-ctx.Done():
+			return nil
+		case err := <-initErrCh:
+			if err != nil {
+				return fmt.Errorf("initialization failed: %w", err)
+			}
+			// Init succeeded, wait for serve to complete
+			return <-serveDone
+		case err := <-serveDone:
 			return fmt.Errorf("failed to serve http: %w", err)
+		}
+	}
+
+	// Stdin/stdout comms - also start immediately
+	serveDone := make(chan error, 1)
+	go func() {
+		t := &mcp.LoggingTransport{
+			Transport: &mcp.StdioTransport{},
+			Writer:    logOutput,
+		}
+		serveDone <- s.Run(ctx, t)
+	}()
+
+	// Wait for context cancellation, init error, or serve error
+	select {
+	case <-ctx.Done():
+		return nil
+	case err := <-initErrCh:
+		if err != nil {
+			return fmt.Errorf("initialization failed: %w", err)
+		}
+		// Init succeeded, wait for serve to complete
+		return <-serveDone
+	case err := <-serveDone:
+		if err != nil {
+			return fmt.Errorf("failed to run stdio server: %w", err)
 		}
 		return nil
 	}
-
-	// Stdin/stdout comms.
-	t := mcp.NewLoggingTransport(mcp.NewStdioTransport(), logOutput)
-	if err := s.Run(ctx, t); err != nil {
-		return fmt.Errorf("failed to run stdio server: %w", err)
-	}
-	return nil
 }
 
 func logger(sink io.Writer) (*slog.Logger, error) {
@@ -176,6 +200,40 @@ func buildVersion() (modVersion, vcsRef string) {
 	}
 
 	return info.Main.Version, vcsRef
+}
+
+// initializeDatabase loads packages and creates a read-only SQLite database.
+func initializeDatabase(ctx context.Context, log *slog.Logger, integrationsDir string) (*sql.DB, error) {
+	// Read packages from the integrations repo.
+	pkgs, err := loadPackages(log, integrationsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load packages: %w", err)
+	}
+
+	// Create a new DB.
+	if err = os.Remove("fleetpkg.db"); err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("failed to remove existing database: %w", err)
+	}
+	db, err := sql.Open("sqlite", "file:fleetpkg.db")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open new database: %w", err)
+	}
+
+	if err = fleetsql.WritePackages(ctx, db, pkgs); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to write packages to DB: %w", err)
+	}
+	if err = db.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close database: %w", err)
+	}
+
+	// Open the database as read-only.
+	db, err = sql.Open("sqlite", "file:fleetpkg.db?mode=ro")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database readonly: %w", err)
+	}
+
+	return db, nil
 }
 
 // loadPackages loads integration packages from the specified directory.
