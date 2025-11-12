@@ -318,7 +318,7 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 
 		// Data stream ingest pipelines.
 		for name, pipeline := range ds.Pipelines {
-			_, err = q.InsertIngestPipeline(ctx, database.InsertIngestPipelineParams{
+			pipelineID, err := q.InsertIngestPipeline(ctx, database.InsertIngestPipelineParams{
 				DataStreamID: dsID,
 				Name:         sqlStringEmtpyIsNull(name),
 				Description:  sqlStringEmtpyIsNull(pipeline.Description),
@@ -328,6 +328,58 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 			})
 			if err != nil {
 				return err
+			}
+
+			// Flatten and insert processors.
+			processors, err := FlattenProcessors(pipeline.Processors, "/processors")
+			if err != nil {
+				return fmt.Errorf("failed to flatten processors for pipeline %s: %w", name, err)
+			}
+			for _, proc := range processors {
+				attrs, err := proc.MarshalAttributes()
+				if err != nil {
+					return fmt.Errorf("failed to marshal processor attributes: %w", err)
+				}
+
+				_, err = q.InsertIngestProcessor(ctx, database.InsertIngestProcessorParams{
+					IngestPipelineID: pipelineID,
+					Type:             proc.Type,
+					Attributes:       sqlStringEmtpyIsNull(attrs),
+					JsonPointer:      proc.JSONPointer,
+					FilePath:         proc.FilePath,
+					LineNumber:       int64(proc.Line),
+					Col:              int64(proc.Column),
+				})
+				if err != nil {
+					return fmt.Errorf("failed to insert processor %s at %s: %w", proc.Type, proc.JSONPointer, err)
+				}
+			}
+
+			// Flatten and insert global on_failure processors.
+			if len(pipeline.OnFailure) > 0 {
+				onFailureProcessors, err := FlattenProcessors(pipeline.OnFailure, "/on_failure")
+				if err != nil {
+					return fmt.Errorf("failed to flatten on_failure processors for pipeline %s: %w", name, err)
+				}
+				for _, proc := range onFailureProcessors {
+					attrs, err := proc.MarshalAttributes()
+					if err != nil {
+						return fmt.Errorf("failed to marshal on_failure processor attributes: %w", err)
+					}
+
+					_, err = q.InsertIngestProcessor(ctx, database.InsertIngestProcessorParams{
+						IngestPipelineID: pipelineID,
+						Type:             proc.Type,
+						Attributes:       sqlStringEmtpyIsNull(attrs),
+						JsonPointer:      proc.JSONPointer,
+						FilePath:         proc.FilePath,
+						LineNumber:       int64(proc.Line),
+						Col:              int64(proc.Column),
+					})
+					if err != nil {
+						return fmt.Errorf("failed to insert on_failure processor %s at %s: %w", proc.Type, proc.JSONPointer, err)
+					}
+				}
 			}
 		}
 

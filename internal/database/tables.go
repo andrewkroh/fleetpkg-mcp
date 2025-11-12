@@ -395,6 +395,19 @@ CREATE TABLE IF NOT EXISTS ingest_pipelines (
     FOREIGN KEY (data_stream_id) REFERENCES data_streams(id)
 );`
 
+const IngestProcessorsTableStatement = `-- Ingest processors within pipelines. Related to ingest_pipelines via foreign key.
+CREATE TABLE IF NOT EXISTS ingest_processors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
+    ingest_pipeline_id INTEGER NOT NULL, -- foreign key to ingest_pipelines table
+    type TEXT NOT NULL, -- ingest processor type
+    attributes JSON, -- processor configuration (JSON)
+    json_pointer TEXT NOT NULL, -- JSON Pointer (RFC 6901) location within the pipeline (e.g. '/processors/12/append' or '/on_failure/1/append').
+    file_path TEXT NOT NULL, -- file path where the processor is defined
+    line_number INTEGER NOT NULL, -- line number in the file
+    col INTEGER NOT NULL, -- character position in the file
+    FOREIGN KEY (ingest_pipeline_id) REFERENCES ingest_pipelines(id)
+);`
+
 const SampleEventsTableStatement = `-- Sample event data for data streams. Related to data_streams via foreign key.
 CREATE TABLE IF NOT EXISTS sample_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
@@ -434,5 +447,6 @@ var Creates = [...]string{
 	ReleasesTableStatement,
 	ChangesTableStatement,
 	IngestPipelinesTableStatement,
+	IngestProcessorsTableStatement,
 	SampleEventsTableStatement,
 }
