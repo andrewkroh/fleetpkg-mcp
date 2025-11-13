@@ -266,7 +266,7 @@ type Release struct {
 type SampleEvent struct {
 	ID           int64
 	DataStreamID int64
-	Event        sql.NullString
+	Event        interface{}
 	FilePath     string
 }
 

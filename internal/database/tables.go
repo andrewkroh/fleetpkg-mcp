@@ -419,7 +419,7 @@ const SampleEventsTableStatement = `-- Sample event data for data streams. Relat
 CREATE TABLE IF NOT EXISTS sample_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
     data_stream_id INTEGER NOT NULL, -- foreign key to data_streams table
-    event TEXT, -- sample event data (JSON)
+    event JSON NOT NULL, -- sample event data (JSON)
     file_path TEXT NOT NULL, -- path to the sample event file
     FOREIGN KEY (data_stream_id) REFERENCES data_streams(id)
 );`

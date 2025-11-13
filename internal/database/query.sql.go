@@ -710,7 +710,7 @@ VALUES (?, ?, ?) RETURNING id
 
 type InsertSampleEventParams struct {
 	DataStreamID int64
-	Event        sql.NullString
+	Event        interface{}
 	FilePath     string
 }
 

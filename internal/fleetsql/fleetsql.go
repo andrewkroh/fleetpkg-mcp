@@ -402,9 +402,13 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 
 		// Data stream sample event.
 		if ds.SampleEvent != nil {
+			eventJSON, err := json.Marshal(ds.SampleEvent.Event)
+			if err != nil {
+				return fmt.Errorf("failed to marshal sample event: %w", err)
+			}
 			_, err = q.InsertSampleEvent(ctx, database.InsertSampleEventParams{
 				DataStreamID: dsID,
-				Event:        jsonNullString(ds.SampleEvent.Event),
+				Event:        eventJSON,
 				FilePath:     ds.SampleEvent.Path(),
 			})
 			if err != nil {
