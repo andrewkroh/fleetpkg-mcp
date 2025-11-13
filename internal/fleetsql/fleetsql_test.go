@@ -84,7 +84,7 @@ func loadPackages(log *slog.Logger, integrationsDir string) ([]fleetpkg.Integrat
 		}
 		integrations = append(integrations, *p)
 	}
-	log.Info("Discovered packages", "count", len(integrations))
+	log.Info("Discovered packages", slog.Int("count", len(integrations)))
 
 	return integrations, nil
 }

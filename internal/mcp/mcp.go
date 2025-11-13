@@ -73,18 +73,18 @@ func (t *tools) executeQuery(ctx context.Context, req *mcp.CallToolRequest, args
 		return mcpErrorf("database is still initializing, please retry in a moment"), nil, nil
 	}
 
-	t.log.InfoContext(ctx, "Executing query", "statement", args.Statement)
+	t.log.InfoContext(ctx, "Executing query", slog.String("statement", args.Statement))
 
 	rows, err := db.QueryContext(ctx, args.Statement)
 	if err != nil {
-		t.log.ErrorContext(ctx, "error executing query", "error", err)
+		t.log.ErrorContext(ctx, "error executing query", slog.Any("error", err))
 		return mcpErrorf("failed to execute query: %v", err), nil, nil
 	}
 	defer rows.Close()
 
 	columns, err := rows.Columns()
 	if err != nil {
-		t.log.ErrorContext(ctx, "Error getting columns", "error", err)
+		t.log.ErrorContext(ctx, "Error getting columns", slog.Any("error", err))
 		return mcpErrorf("failed to get columns: %v", err), nil, nil
 	}
 
@@ -97,7 +97,7 @@ func (t *tools) executeQuery(ctx context.Context, req *mcp.CallToolRequest, args
 		}
 
 		if err := rows.Scan(pointers...); err != nil {
-			t.log.ErrorContext(ctx, "Error scanning row", "error", err)
+			t.log.ErrorContext(ctx, "Error scanning row", slog.Any("error", err))
 			return mcpErrorf("failed to scan row: %v", err), nil, nil
 		}
 
@@ -119,7 +119,7 @@ func (t *tools) executeQuery(ctx context.Context, req *mcp.CallToolRequest, args
 		return mcpErrorf("failed to marshal result: %v", err), nil, nil
 	}
 
-	t.log.InfoContext(ctx, "Query executed successfully", "row_count", len(result))
+	t.log.InfoContext(ctx, "Query executed successfully", slog.Int("row_count", len(result)))
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: string(jsonRows)},

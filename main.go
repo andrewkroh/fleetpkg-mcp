@@ -72,7 +72,7 @@ func run(integrationsDir string) error {
 	slog.SetDefault(log)
 
 	modVer, vcsRef := buildVersion()
-	log.Info("fleetpkg-mcp is starting...", slog.Any("version", modVer), slog.Any("vcs_ref", vcsRef))
+	log.Info("fleetpkg-mcp is starting...", slog.String("version", modVer), slog.String("vcs_ref", vcsRef))
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -95,12 +95,12 @@ func run(integrationsDir string) error {
 		log.Info("Starting database initialization...")
 		db, err := initializeDatabase(ctx, log, integrationsDir)
 		if err != nil {
-			log.Error("Database initialization failed", "error", err)
+			log.Error("Database initialization failed", slog.Any("error", err))
 			initErrCh <- err
 			return
 		}
 		dbPtr.Store(db)
-		log.Info("Database initialization completed", slog.Any("duration", time.Since(start)))
+		log.Info("Database initialization completed", slog.Duration("duration", time.Since(start)))
 		close(initErrCh)
 	}()
 
@@ -257,7 +257,7 @@ func loadPackages(log *slog.Logger, integrationsDir string) ([]fleetpkg.Integrat
 		}
 		integrations = append(integrations, *p)
 	}
-	log.Info("Discovered packages", "count", len(integrations))
+	log.Info("Discovered packages", slog.Int("count", len(integrations)))
 
 	return integrations, nil
 }
