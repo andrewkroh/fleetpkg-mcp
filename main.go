@@ -16,7 +16,9 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -249,14 +251,52 @@ func loadPackages(log *slog.Logger, integrationsDir string) ([]fleetpkg.Integrat
 		return nil, fmt.Errorf("no packages found in %s", integrationsDir)
 	}
 
-	var integrations []fleetpkg.Integration
-	for _, pkgPath := range packages {
-		p, err := fleetpkg.Read(pkgPath)
-		if err != nil {
-			return nil, err
-		}
-		integrations = append(integrations, *p)
+	// Use bounded concurrency based on GOMAXPROCS
+	workers := runtime.GOMAXPROCS(0)
+	type result struct {
+		integration fleetpkg.Integration
+		err         error
 	}
+
+	jobs := make(chan string, len(packages))
+	results := make(chan result, len(packages))
+
+	// Start worker pool
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for pkgPath := range jobs {
+				p, err := fleetpkg.Read(pkgPath, fleetpkg.WithChangelogDates())
+				if err != nil {
+					results <- result{err: err}
+					return
+				}
+				results <- result{integration: *p}
+			}
+		}()
+	}
+
+	// Send jobs
+	for _, pkgPath := range packages {
+		jobs <- pkgPath
+	}
+	close(jobs)
+
+	// Wait for all workers to finish
+	wg.Wait()
+	close(results)
+
+	// Collect results
+	integrations := make([]fleetpkg.Integration, 0, len(packages))
+	for res := range results {
+		if res.err != nil {
+			return nil, res.err
+		}
+		integrations = append(integrations, res.integration)
+	}
+
 	log.Info("Discovered packages", slog.Int("count", len(integrations)))
 
 	return integrations, nil

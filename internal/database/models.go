@@ -257,10 +257,11 @@ type PolicyTemplateVar struct {
 type Release struct {
 	ID          int64
 	ChangelogID int64
-	Version     sql.NullString
+	Version     string
+	Date        string
 	FilePath    string
-	LineNumber  sql.NullInt64
-	Col         sql.NullInt64
+	LineNumber  int64
+	Col         int64
 }
 
 type SampleEvent struct {

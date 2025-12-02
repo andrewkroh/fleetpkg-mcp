@@ -365,10 +365,11 @@ CREATE TABLE IF NOT EXISTS changelogs (
 CREATE TABLE IF NOT EXISTS releases (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
     changelog_id INTEGER NOT NULL, -- foreign key to changelogs table
-    version TEXT, -- version of the release
+    version TEXT NOT NULL, -- version of the release
+    date TEXT NOT NULL, -- release date derived from git blame
     file_path TEXT NOT NULL, -- file path where the release is defined
-    line_number INTEGER, -- line number in the file
-    col INTEGER, -- character position in the file
+    line_number INTEGER NOT NULL, -- line number in the file
+    col INTEGER NOT NULL, -- character position in the file
     FOREIGN KEY (changelog_id) REFERENCES changelogs(id)
 );
 
