@@ -38,6 +38,7 @@ var (
 	noLog           = flag.Bool("no-log", false, "if set, disables logging")
 	logLevel        = flag.String("log-level", "info", "log level (debug, info, warn, error)")
 	integrationsDir = flag.String("dir", "", "path to elastic/integrations directory")
+	refresh         = flag.String("refresh", "", "periodically refresh database at this interval (e.g., 1h, 30m)")
 	version         = flag.Bool("version", false, "print version and exit")
 )
 
@@ -90,20 +91,111 @@ func run(integrationsDir string) error {
 	}, nil)
 	fleetmcp.AddTools(s, fleetsql.TableSchemas(), dbPtr, log)
 
+	// Track database file path for cleanup.
+	var dbPath string
+	var dbPathMu sync.Mutex
+
+	// Parse refresh interval if provided.
+	var refreshInterval time.Duration
+	if *refresh != "" {
+		var err error
+		refreshInterval, err = time.ParseDuration(*refresh)
+		if err != nil {
+			return fmt.Errorf("invalid refresh duration %q: %w", *refresh, err)
+		}
+		if refreshInterval <= 0 {
+			return fmt.Errorf("refresh interval must be positive, got %v", refreshInterval)
+		}
+		log.Info("Periodic refresh enabled", slog.Duration("interval", refreshInterval))
+	}
+
+	// Channel to signal initialization completion (for refresh goroutine).
+	initDoneCh := make(chan struct{})
+
 	// Start initialization in background
 	initErrCh := make(chan error, 1)
 	go func() {
 		start := time.Now()
 		log.Info("Starting database initialization...")
-		db, err := initializeDatabase(ctx, log, integrationsDir)
+		db, path, err := initializeDatabase(ctx, log, integrationsDir)
 		if err != nil {
 			log.Error("Database initialization failed", slog.Any("error", err))
 			initErrCh <- err
 			return
 		}
 		dbPtr.Store(db)
-		log.Info("Database initialization completed", slog.Duration("duration", time.Since(start)))
+		dbPathMu.Lock()
+		dbPath = path
+		dbPathMu.Unlock()
+		log.Info("Database initialization completed", slog.Duration("duration", time.Since(start)), slog.String("path", path))
+		close(initDoneCh)
 		close(initErrCh)
+	}()
+
+	// Start periodic refresh goroutine if enabled.
+	if refreshInterval > 0 {
+		go func() {
+			// Wait for initial initialization to complete successfully.
+			select {
+			case <-ctx.Done():
+				return
+			case <-initDoneCh:
+				// Initialization succeeded, proceed with periodic refresh.
+			}
+
+			// Get the database path.
+			dbPathMu.Lock()
+			path := dbPath
+			dbPathMu.Unlock()
+
+			ticker := time.NewTicker(refreshInterval)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					log.Info("Starting periodic database refresh...")
+					start := time.Now()
+					newDB, err := refreshDatabase(ctx, log, path, integrationsDir)
+					if err != nil {
+						log.Error("Periodic database refresh failed", slog.Any("error", err))
+						continue
+					}
+
+					// Atomically swap the old database with the new one.
+					oldDB := dbPtr.Swap(newDB)
+					if oldDB != nil {
+						oldDB.Close()
+					}
+					log.Info("Periodic database refresh completed", slog.Duration("duration", time.Since(start)))
+				}
+			}
+		}()
+	}
+
+	// Set up cleanup on exit.
+	defer func() {
+		// Close database connection.
+		if db := dbPtr.Load(); db != nil {
+			if err := db.Close(); err != nil {
+				log.Error("Failed to close database", slog.Any("error", err))
+			}
+		}
+
+		// Delete database file.
+		dbPathMu.Lock()
+		path := dbPath
+		dbPathMu.Unlock()
+
+		if path != "" {
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				log.Error("Failed to remove database file", slog.String("path", path), slog.Any("error", err))
+			} else if err == nil {
+				log.Info("Cleaned up database file", slog.String("path", path))
+			}
+		}
 	}()
 
 	// Listen over HTTP.
@@ -206,33 +298,122 @@ func buildVersion() (modVersion, vcsRef string) {
 	return info.Main.Version, vcsRef
 }
 
+// getDatabasePath returns the path to the database file in an OS-specific
+// application data directory. Each process gets its own unique file using the PID.
+func getDatabasePath() (string, error) {
+	var dbDir string
+	var err error
+
+	switch runtime.GOOS {
+	case "windows":
+		// Windows: Use LOCALAPPDATA
+		if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
+			dbDir = filepath.Join(localAppData, "fleetpkg-mcp")
+		} else {
+			// Fallback to UserConfigDir if LOCALAPPDATA is not set
+			dbDir, err = os.UserConfigDir()
+			if err != nil {
+				return "", fmt.Errorf("failed to get user config directory: %w", err)
+			}
+			dbDir = filepath.Join(dbDir, "fleetpkg-mcp")
+		}
+	default:
+		// Linux/macOS: Use home directory
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get home directory: %w", err)
+		}
+		dbDir = filepath.Join(homeDir, ".fleetpkg-mcp")
+	}
+
+	// Create the directory if it doesn't exist.
+	if err := os.MkdirAll(dbDir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create database directory: %w", err)
+	}
+
+	// Create unique filename using PID.
+	pid := os.Getpid()
+	dbName := fmt.Sprintf("fleetpkg-%d.sqlite", pid)
+	return filepath.Join(dbDir, dbName), nil
+}
+
 // initializeDatabase loads packages and creates a read-only SQLite database.
-func initializeDatabase(ctx context.Context, log *slog.Logger, integrationsDir string) (*sql.DB, error) {
+// Returns the database connection and the database file path.
+func initializeDatabase(ctx context.Context, log *slog.Logger, integrationsDir string) (*sql.DB, string, error) {
+	// Get the per-process database path.
+	dbPath, err := getDatabasePath()
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get database path: %w", err)
+	}
+
+	// Read packages from the integrations repo.
+	pkgs, err := loadPackages(log, integrationsDir)
+	if err != nil {
+		return nil, dbPath, fmt.Errorf("failed to load packages: %w", err)
+	}
+
+	// Create a new DB (each process has its own file, so no need to remove).
+	db, err := sql.Open("sqlite", "file:"+dbPath)
+	if err != nil {
+		return nil, dbPath, fmt.Errorf("failed to open new database: %w", err)
+	}
+
+	if err = fleetsql.WritePackages(ctx, db, pkgs); err != nil {
+		db.Close()
+		return nil, dbPath, fmt.Errorf("failed to write packages to DB: %w", err)
+	}
+	if err = db.Close(); err != nil {
+		return nil, dbPath, fmt.Errorf("failed to close database: %w", err)
+	}
+
+	// Open the database as read-only.
+	db, err = sql.Open("sqlite", "file:"+dbPath+"?mode=ro")
+	if err != nil {
+		return nil, dbPath, fmt.Errorf("failed to open database readonly: %w", err)
+	}
+
+	return db, dbPath, nil
+}
+
+// refreshDatabase rebuilds the database with the latest package data.
+// It returns a new read-only database connection.
+// Uses a temporary file and atomic rename to ensure the database file always exists.
+func refreshDatabase(ctx context.Context, log *slog.Logger, dbPath, integrationsDir string) (*sql.DB, error) {
 	// Read packages from the integrations repo.
 	pkgs, err := loadPackages(log, integrationsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load packages: %w", err)
 	}
 
-	// Create a new DB.
-	if err = os.Remove("fleetpkg.db"); err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("failed to remove existing database: %w", err)
+	// Write to a temporary file first.
+	tmpPath := dbPath + ".tmp"
+	if err := os.Remove(tmpPath); err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("failed to remove existing temp database: %w", err)
 	}
-	db, err := sql.Open("sqlite", "file:fleetpkg.db")
+
+	db, err := sql.Open("sqlite", "file:"+tmpPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open new database: %w", err)
+		return nil, fmt.Errorf("failed to open temp database: %w", err)
 	}
 
 	if err = fleetsql.WritePackages(ctx, db, pkgs); err != nil {
 		db.Close()
+		os.Remove(tmpPath)
 		return nil, fmt.Errorf("failed to write packages to DB: %w", err)
 	}
 	if err = db.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close database: %w", err)
+		os.Remove(tmpPath)
+		return nil, fmt.Errorf("failed to close temp database: %w", err)
+	}
+
+	// Atomically replace the old database with the new one.
+	if err := os.Rename(tmpPath, dbPath); err != nil {
+		os.Remove(tmpPath)
+		return nil, fmt.Errorf("failed to replace database: %w", err)
 	}
 
 	// Open the database as read-only.
-	db, err = sql.Open("sqlite", "file:fleetpkg.db?mode=ro")
+	db, err = sql.Open("sqlite", "file:"+dbPath+"?mode=ro")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database readonly: %w", err)
 	}
