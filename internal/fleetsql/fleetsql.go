@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/andrewkroh/go-ecs"
 	"github.com/andrewkroh/go-fleetpkg"
@@ -464,10 +465,11 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 		for _, release := range in.Changelog.Releases {
 			releaseID, err := q.InsertRelease(ctx, database.InsertReleaseParams{
 				ChangelogID: changelogID,
-				Version:     sqlStringEmtpyIsNull(release.Version),
+				Version:     release.Version,
+				Date:        release.Date.Format(time.RFC3339),
 				FilePath:    release.Path(),
-				LineNumber:  sql.NullInt64{Int64: int64(release.Line()), Valid: release.Line() > 0},
-				Col:         sql.NullInt64{Int64: int64(release.Column()), Valid: release.Column() > 0},
+				LineNumber:  int64(release.Line()),
+				Col:         int64(release.Column()),
 			})
 			if err != nil {
 				return err

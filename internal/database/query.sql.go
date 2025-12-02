@@ -678,22 +678,24 @@ func (q *Queries) InsertPolicyTemplateVar(ctx context.Context, arg InsertPolicyT
 }
 
 const insertRelease = `-- name: InsertRelease :one
-INSERT INTO releases (changelog_id, version, file_path, line_number, col)
-VALUES (?, ?, ?, ?, ?) RETURNING id
+INSERT INTO releases (changelog_id, version, date, file_path, line_number, col)
+VALUES (?, ?, ?, ?, ?, ?) RETURNING id
 `
 
 type InsertReleaseParams struct {
 	ChangelogID int64
-	Version     sql.NullString
+	Version     string
+	Date        string
 	FilePath    string
-	LineNumber  sql.NullInt64
-	Col         sql.NullInt64
+	LineNumber  int64
+	Col         int64
 }
 
 func (q *Queries) InsertRelease(ctx context.Context, arg InsertReleaseParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, insertRelease,
 		arg.ChangelogID,
 		arg.Version,
+		arg.Date,
 		arg.FilePath,
 		arg.LineNumber,
 		arg.Col,

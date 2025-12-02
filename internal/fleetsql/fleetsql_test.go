@@ -78,7 +78,7 @@ func loadPackages(log *slog.Logger, integrationsDir string) ([]fleetpkg.Integrat
 
 	var integrations []fleetpkg.Integration
 	for _, pkgPath := range packages {
-		p, err := fleetpkg.Read(pkgPath)
+		p, err := fleetpkg.Read(pkgPath, fleetpkg.WithChangelogDates())
 		if err != nil {
 			return nil, err
 		}

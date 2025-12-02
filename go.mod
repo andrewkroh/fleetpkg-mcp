@@ -1,14 +1,14 @@
 module github.com/andrewkroh/fleetpkg-mcp
 
-go 1.25.0
+go 1.25.5
 
 require (
-	github.com/andrewkroh/go-ecs v0.0.0-20251111160023-db6307838a95
-	github.com/andrewkroh/go-fleetpkg v0.20.0
+	github.com/andrewkroh/go-ecs v0.0.0-20251125054629-84b679af3cb9
+	github.com/andrewkroh/go-fleetpkg v0.21.0
 	github.com/gorilla/handlers v1.5.2
 	github.com/modelcontextprotocol/go-sdk v1.1.0
 	github.com/stretchr/testify v1.11.1
-	modernc.org/sqlite v1.40.0
+	modernc.org/sqlite v1.40.1
 )
 
 require (
@@ -22,11 +22,11 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
-	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
-	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
+	golang.org/x/exp v0.0.0-20251125195548-87e1e737ad39 // indirect
+	golang.org/x/oauth2 v0.33.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	modernc.org/libc v1.66.10 // indirect
+	modernc.org/libc v1.67.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
