@@ -34,6 +34,41 @@ You can also run the server directly without installing:
 go run github.com/andrewkroh/fleetpkg-mcp@main -dir /path/to/integrations
 ```
 
+### Run with Docker
+
+The Docker image includes git and automatically clones the integrations repository on first run. It listens on HTTP port 8080 and refreshes every 24 hours by default:
+
+```bash
+# Run with defaults (auto-clone, HTTP on port 8080, 24h refresh)
+docker run -p 8080:8080 -v fleetpkg-data:/data \
+  ghcr.io/andrewkroh/fleetpkg-mcp:latest
+
+# Custom refresh interval (e.g., every hour)
+docker run -p 8080:8080 -v fleetpkg-data:/data \
+  -e FLEETPKG_MCP_REFRESH_INTERVAL=1h \
+  ghcr.io/andrewkroh/fleetpkg-mcp:latest
+
+# Disable automatic refresh
+docker run -p 8080:8080 -v fleetpkg-data:/data \
+  -e FLEETPKG_MCP_REFRESH_INTERVAL= \
+  ghcr.io/andrewkroh/fleetpkg-mcp:latest
+
+# Custom port
+docker run -p 9090:9090 -v fleetpkg-data:/data \
+  ghcr.io/andrewkroh/fleetpkg-mcp:latest \
+  -dir /data/integrations -git-pull -http 0.0.0.0:9090
+```
+
+Default behavior:
+- Auto-clones the repository on first run (via `-git-pull` flag)
+- Pulls updates and refreshes database every 24 hours (via `FLEETPKG_MCP_REFRESH_INTERVAL=24h`)
+- Listens on HTTP at `0.0.0.0:8080`
+- Stores data in `/data/integrations`
+
+#### Environment Variables
+
+- `FLEETPKG_MCP_REFRESH_INTERVAL`: Duration between automatic refreshes (e.g., `1h`, `30m`, `24h`). Defaults to `24h`. Set to empty string to disable automatic refresh.
+
 ## MCP Server Setup
 
 The `fleetpkg-mcp` server can be configured as an MCP server in your AI
@@ -152,6 +187,12 @@ fleetpkg-mcp -version
 #### Optional
 
 - `-http <address>`: Listen for HTTP connections at the specified address instead of using stdin/stdout. Example: `127.0.0.1:1234`
+- `-git-pull`: Automatically clone and update the elastic/integrations repository. When enabled:
+  - Clones `https://github.com/elastic/integrations` if the directory doesn't exist or is empty
+  - Runs `git pull --ff-only` if the directory already contains a git repository
+  - Updates before each periodic refresh (if `-refresh` is also set)
+  - Uses shallow clone (`--depth=1`) for faster initial download
+- `-refresh <duration>`: Periodically refresh the database at the specified interval (e.g., `1h`, `30m`). Falls back to `FLEETPKG_MCP_REFRESH_INTERVAL` environment variable if not set. Works well with `-git-pull` to keep data up to date
 - `-log-level <level>`: Set log level. Options: `debug`, `info`, `warn`, `error`. Default: `info`
 - `-no-log`: Disable all logging output
 - `-version`: Print version information and exit

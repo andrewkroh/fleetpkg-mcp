@@ -54,7 +54,17 @@ func main() {
 
 	if *integrationsDir == "" {
 		fmt.Fprintln(os.Stderr, "ERROR: -dir flag is required")
+		fmt.Fprintln(os.Stderr, "Example: -dir /data/integrations")
 		os.Exit(2)
+	}
+
+	// Warn if -git-pull not set and dir doesn't exist
+	if !*gitPull {
+		if _, err := os.Stat(*integrationsDir); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "ERROR: directory %q does not exist and -git-pull is not enabled\n", *integrationsDir)
+			fmt.Fprintln(os.Stderr, "Either create the directory with integrations data, or use -git-pull to clone automatically")
+			os.Exit(2)
+		}
 	}
 
 	if err := run(*integrationsDir); err != nil {
@@ -97,18 +107,27 @@ func run(integrationsDir string) error {
 	var dbPath string
 	var dbPathMu sync.Mutex
 
-	// Parse refresh interval if provided.
+	// Parse refresh interval from flag or environment variable.
 	var refreshInterval time.Duration
-	if *refresh != "" {
+	refreshStr := *refresh
+	if refreshStr == "" {
+		// Fall back to FLEETPKG_MCP_REFRESH_INTERVAL environment variable
+		refreshStr = os.Getenv("FLEETPKG_MCP_REFRESH_INTERVAL")
+	}
+	if refreshStr != "" {
 		var err error
-		refreshInterval, err = time.ParseDuration(*refresh)
+		refreshInterval, err = time.ParseDuration(refreshStr)
 		if err != nil {
-			return fmt.Errorf("invalid refresh duration %q: %w", *refresh, err)
+			return fmt.Errorf("invalid refresh duration %q: %w", refreshStr, err)
 		}
 		if refreshInterval <= 0 {
 			return fmt.Errorf("refresh interval must be positive, got %v", refreshInterval)
 		}
-		log.Info("Periodic refresh enabled", slog.Duration("interval", refreshInterval))
+		source := "flag"
+		if *refresh == "" {
+			source = "FLEETPKG_MCP_REFRESH_INTERVAL env"
+		}
+		log.Info("Periodic refresh enabled", slog.Duration("interval", refreshInterval), slog.String("source", source))
 	}
 
 	// Channel to signal initialization completion (for refresh goroutine).
@@ -119,8 +138,10 @@ func run(integrationsDir string) error {
 	go func() {
 		start := time.Now()
 		if *gitPull {
-			if err := gitPullRepo(ctx, log, integrationsDir); err != nil {
-				log.Error("Git pull failed before initial load", slog.Any("error", err))
+			if err := ensureGitRepo(ctx, log, integrationsDir); err != nil {
+				log.Error("Failed to ensure git repository", slog.Any("error", err))
+				initErrCh <- fmt.Errorf("failed to ensure git repository: %w", err)
+				return
 			}
 		}
 		log.Info("Starting database initialization...")
@@ -164,8 +185,8 @@ func run(integrationsDir string) error {
 					return
 				case <-ticker.C:
 					if *gitPull {
-						if err := gitPullRepo(ctx, log, integrationsDir); err != nil {
-							log.Error("Git pull failed before refresh", slog.Any("error", err))
+						if err := ensureGitRepo(ctx, log, integrationsDir); err != nil {
+							log.Error("Failed to update git repository before refresh", slog.Any("error", err))
 						}
 					}
 					log.Info("Starting periodic database refresh...")
@@ -450,6 +471,76 @@ func gitPullRepo(ctx context.Context, log *slog.Logger, dir string) error {
 	}
 	log.Info("Git pull completed", slog.Duration("duration", time.Since(start)), slog.String("output", string(output)))
 	return nil
+}
+
+// gitCloneRepo clones the elastic/integrations repository into the given directory.
+// It uses a shallow clone to minimize download size and time.
+func gitCloneRepo(ctx context.Context, log *slog.Logger, dir string) error {
+	log.Info("Cloning integrations repository...", slog.String("dir", dir))
+	start := time.Now()
+
+	// Create parent directory if needed
+	if err := os.MkdirAll(filepath.Dir(dir), 0755); err != nil {
+		return fmt.Errorf("failed to create parent directory: %w", err)
+	}
+
+	cmd := exec.CommandContext(ctx, "git", "clone",
+		"--depth=1",
+		"--single-branch",
+		"--no-tags",
+		"https://github.com/elastic/integrations.git",
+		dir)
+	cmd.Env = append(os.Environ(),
+		"GIT_TERMINAL_PROMPT=0",
+		"GIT_SSH_COMMAND=ssh -o BatchMode=yes",
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git clone failed: %w: %s", err, output)
+	}
+
+	log.Info("Git clone completed", slog.Duration("duration", time.Since(start)))
+	return nil
+}
+
+// ensureGitRepo ensures the integrations repository exists and is up to date.
+// It clones the repository if it doesn't exist or is empty, and pulls updates
+// if it already exists.
+func ensureGitRepo(ctx context.Context, log *slog.Logger, dir string) error {
+	// Check if directory exists
+	stat, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		// Directory doesn't exist, clone it
+		return gitCloneRepo(ctx, log, dir)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to check directory: %w", err)
+	}
+
+	if !stat.IsDir() {
+		return fmt.Errorf("%q is not a directory", dir)
+	}
+
+	// Check if directory is empty
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("failed to read directory: %w", err)
+	}
+
+	if len(entries) == 0 {
+		// Empty directory, clone into it
+		return gitCloneRepo(ctx, log, dir)
+	}
+
+	// Check if it's a git repository
+	gitDir := filepath.Join(dir, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		return fmt.Errorf("directory %q exists but is not a git repository; please remove it or use a different path", dir)
+	}
+
+	// Existing git repo, pull updates
+	return gitPullRepo(ctx, log, dir)
 }
 
 // loadPackages loads integration packages from the specified directory.
