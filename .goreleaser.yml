@@ -1,0 +1,40 @@
+version: 2
+project_name: fleetpkg-mcp
+
+builds:
+  - id: fleetpkg-mcp
+    main: .
+    binary: fleetpkg-mcp
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [gz]
+    files:
+      - none*
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+
+changelog:
+  use: github-native
+
+dockers_v2:
+  - id: fleetpkg-mcp
+    dockerfile: Dockerfile
+    ids: [fleetpkg-mcp]
+    images:
+      - "ghcr.io/andrewkroh/fleetpkg-mcp"
+    tags: ["{{ .Tag }}", latest]
+    platforms: [linux/amd64, linux/arm64]
+    labels:
+      org.opencontainers.image.created: "{{ .Date }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.source: "{{ .GitURL }}"
+      org.opencontainers.image.version: "{{ .Version }}"
