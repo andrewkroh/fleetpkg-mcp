@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
@@ -39,6 +40,7 @@ var (
 	logLevel        = flag.String("log-level", "info", "log level (debug, info, warn, error)")
 	integrationsDir = flag.String("dir", "", "path to elastic/integrations directory")
 	refresh         = flag.String("refresh", "", "periodically refresh database at this interval (e.g., 1h, 30m)")
+	gitPull         = flag.Bool("git-pull", false, "run 'git pull' on the integrations directory before each database load")
 	version         = flag.Bool("version", false, "print version and exit")
 )
 
@@ -116,6 +118,11 @@ func run(integrationsDir string) error {
 	initErrCh := make(chan error, 1)
 	go func() {
 		start := time.Now()
+		if *gitPull {
+			if err := gitPullRepo(ctx, log, integrationsDir); err != nil {
+				log.Error("Git pull failed before initial load", slog.Any("error", err))
+			}
+		}
 		log.Info("Starting database initialization...")
 		db, path, err := initializeDatabase(ctx, log, integrationsDir)
 		if err != nil {
@@ -156,6 +163,11 @@ func run(integrationsDir string) error {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
+					if *gitPull {
+						if err := gitPullRepo(ctx, log, integrationsDir); err != nil {
+							log.Error("Git pull failed before refresh", slog.Any("error", err))
+						}
+					}
 					log.Info("Starting periodic database refresh...")
 					start := time.Now()
 					newDB, err := refreshDatabase(ctx, log, path, integrationsDir)
@@ -419,6 +431,25 @@ func refreshDatabase(ctx context.Context, log *slog.Logger, dbPath, integrations
 	}
 
 	return db, nil
+}
+
+// gitPullRepo runs 'git pull --ff-only' in the given directory.
+// Environment variables are set to prevent any interactive prompts that
+// would block in an automated/containerized environment.
+func gitPullRepo(ctx context.Context, log *slog.Logger, dir string) error {
+	log.Info("Running git pull...", slog.String("dir", dir))
+	start := time.Now()
+	cmd := exec.CommandContext(ctx, "git", "-C", dir, "pull", "--ff-only", "--no-color")
+	cmd.Env = append(os.Environ(),
+		"GIT_TERMINAL_PROMPT=0",                // Disable HTTPS credential prompts.
+		"GIT_SSH_COMMAND=ssh -o BatchMode=yes", // Disable SSH passphrase/password prompts.
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git pull failed: %w: %s", err, output)
+	}
+	log.Info("Git pull completed", slog.Duration("duration", time.Since(start)), slog.String("output", string(output)))
+	return nil
 }
 
 // loadPackages loads integration packages from the specified directory.
