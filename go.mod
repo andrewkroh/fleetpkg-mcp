@@ -6,7 +6,7 @@ require (
 	github.com/andrewkroh/go-ecs v0.0.0-20251125054629-84b679af3cb9
 	github.com/andrewkroh/go-fleetpkg v0.21.0
 	github.com/gorilla/handlers v1.5.2
-	github.com/modelcontextprotocol/go-sdk v1.1.0
+	github.com/modelcontextprotocol/go-sdk v1.2.0
 	github.com/stretchr/testify v1.11.1
 	modernc.org/sqlite v1.41.0
 )
