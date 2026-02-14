@@ -29,6 +29,8 @@ import (
 
 	"github.com/andrewkroh/fleetpkg-mcp/internal/fleetsql"
 	fleetmcp "github.com/andrewkroh/fleetpkg-mcp/internal/mcp"
+	"github.com/andrewkroh/fleetpkg-mcp/internal/otelsetup"
+	"github.com/andrewkroh/fleetpkg-mcp/internal/slogutil"
 
 	// Register SQLite database driver.
 	_ "modernc.org/sqlite"
@@ -92,6 +94,23 @@ func run(integrationsDir string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
+	// Set up OpenTelemetry metrics.
+	shutdownMetrics, err := otelsetup.SetupMetrics(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to setup metrics: %w", err)
+	}
+	defer func() {
+		if err := shutdownMetrics(ctx); err != nil {
+			log.Error("Failed to shutdown metrics", slog.Any("error", err))
+		}
+	}()
+
+	// Initialize metric instruments.
+	metrics, err := otelsetup.NewMetrics()
+	if err != nil {
+		return fmt.Errorf("failed to create metrics: %w", err)
+	}
+
 	// Create atomic DB pointer for lazy initialization
 	dbPtr := &atomic.Pointer[sql.DB]{}
 
@@ -101,7 +120,7 @@ func run(integrationsDir string) error {
 		Title:   "Elastic Fleet Integration Package metadata MCP server",
 		Version: modVer + " (" + vcsRef + ")",
 	}, nil)
-	fleetmcp.AddTools(s, fleetsql.TableSchemas(), dbPtr, log)
+	fleetmcp.AddTools(s, fleetsql.TableSchemas(), dbPtr, log, metrics)
 
 	// Track database file path for cleanup.
 	var dbPath string
@@ -146,8 +165,10 @@ func run(integrationsDir string) error {
 		}
 		log.Info("Starting database initialization...")
 		db, path, err := initializeDatabase(ctx, log, integrationsDir)
+		duration := time.Since(start)
 		if err != nil {
 			log.Error("Database initialization failed", slog.Any("error", err))
+			metrics.RecordError(ctx, "db_init")
 			initErrCh <- err
 			return
 		}
@@ -155,7 +176,8 @@ func run(integrationsDir string) error {
 		dbPathMu.Lock()
 		dbPath = path
 		dbPathMu.Unlock()
-		log.Info("Database initialization completed", slog.Duration("duration", time.Since(start)), slog.String("path", path))
+		metrics.RecordDBInit(ctx, duration)
+		log.Info("Database initialization completed", slog.Duration("duration", duration), slog.String("path", path))
 		close(initDoneCh)
 		close(initErrCh)
 	}()
@@ -247,6 +269,14 @@ func run(integrationsDir string) error {
 		log.Info("fleetpkg-mcp handler listening",
 			slog.String("addr", "http://"+listener.Addr().String()))
 
+		// Add middleware chain (innermost to outermost):
+		// 1. MCP handler (innermost)
+		// 2. User context middleware (extracts headers)
+		// 3. Metrics middleware (records request metrics)
+		// 4. Logging handler (outermost, optional)
+		handler = userContextMiddleware(handler)
+		handler = metricsMiddleware(metrics, handler)
+
 		if !*noLog {
 			handler = handlers.CombinedLoggingHandler(os.Stdout, handler)
 		}
@@ -306,13 +336,14 @@ func logger(sink io.Writer) (*slog.Logger, error) {
 		return nil, err
 	}
 
-	return slog.New(
-		slog.NewTextHandler(
-			sink,
-			&slog.HandlerOptions{
-				Level: level,
-			},
-		)), nil
+	textHandler := slog.NewTextHandler(sink, &slog.HandlerOptions{
+		Level: level,
+	})
+
+	// Wrap with UserContextHandler to automatically add user info from context.
+	userContextHandler := slogutil.NewUserContextHandler(textHandler)
+
+	return slog.New(userContextHandler), nil
 }
 
 func buildVersion() (modVersion, vcsRef string) {
@@ -460,7 +491,7 @@ func refreshDatabase(ctx context.Context, log *slog.Logger, dbPath, integrations
 func gitPullRepo(ctx context.Context, log *slog.Logger, dir string) error {
 	log.Info("Running git pull...", slog.String("dir", dir))
 	start := time.Now()
-	cmd := exec.CommandContext(ctx, "git", "-C", dir, "pull", "--ff-only", "--no-color")
+	cmd := exec.CommandContext(ctx, "git", "-C", dir, "pull", "--ff-only")
 	cmd.Env = append(os.Environ(),
 		"GIT_TERMINAL_PROMPT=0",                // Disable HTTPS credential prompts.
 		"GIT_SSH_COMMAND=ssh -o BatchMode=yes", // Disable SSH passphrase/password prompts.
@@ -480,7 +511,7 @@ func gitCloneRepo(ctx context.Context, log *slog.Logger, dir string) error {
 	start := time.Now()
 
 	// Create parent directory if needed
-	if err := os.MkdirAll(filepath.Dir(dir), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
 
@@ -603,4 +634,52 @@ func loadPackages(log *slog.Logger, integrationsDir string) ([]fleetpkg.Integrat
 	log.Info("Discovered packages", slog.Int("count", len(integrations)))
 
 	return integrations, nil
+}
+
+// userContextMiddleware extracts user information from HTTP headers
+// and adds it to the request context for logging.
+func userContextMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		// Extract user headers and add to context.
+		if login := r.Header.Get("X-Auth-User-Login"); login != "" {
+			ctx = slogutil.WithUserLogin(ctx, login)
+		}
+		if email := r.Header.Get("X-Auth-User-Email"); email != "" {
+			ctx = slogutil.WithUserEmail(ctx, email)
+		}
+		if user := r.Header.Get("X-Forwarded-User"); user != "" {
+			ctx = slogutil.WithForwardedUser(ctx, user)
+		}
+
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// responseWriter wraps http.ResponseWriter to capture the status code.
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+// WriteHeader captures the status code and delegates to the wrapped ResponseWriter.
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+// metricsMiddleware records HTTP request metrics.
+func metricsMiddleware(metrics *otelsetup.Metrics, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		// Wrap response writer to capture status code.
+		rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+
+		next.ServeHTTP(rw, r)
+
+		// Record metrics after request completes.
+		metrics.RecordHTTPRequest(r.Context(), r.Method, r.URL.Path, rw.statusCode, time.Since(start))
+	})
 }

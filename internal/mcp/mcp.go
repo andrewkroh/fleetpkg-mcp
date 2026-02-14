@@ -12,26 +12,31 @@ import (
 	"log/slog"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/andrewkroh/fleetpkg-mcp/internal/otelsetup"
 )
 
 type tools struct {
-	tables []string
-	db     *atomic.Pointer[sql.DB]
-	log    *slog.Logger
+	tables  []string
+	db      *atomic.Pointer[sql.DB]
+	log     *slog.Logger
+	metrics *otelsetup.Metrics
 }
 
-func newTools(tables []string, db *atomic.Pointer[sql.DB], log *slog.Logger) *tools {
+func newTools(tables []string, db *atomic.Pointer[sql.DB], log *slog.Logger, metrics *otelsetup.Metrics) *tools {
 	return &tools{
-		tables: tables,
-		db:     db,
-		log:    log,
+		tables:  tables,
+		db:      db,
+		log:     log,
+		metrics: metrics,
 	}
 }
 
-func AddTools(s *mcp.Server, tables []string, db *atomic.Pointer[sql.DB], log *slog.Logger) {
-	t := newTools(tables, db, log)
+func AddTools(s *mcp.Server, tables []string, db *atomic.Pointer[sql.DB], log *slog.Logger, metrics *otelsetup.Metrics) {
+	t := newTools(tables, db, log, metrics)
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "fleetpkg_get_sql_tables",
@@ -53,8 +58,15 @@ Be sure you have called fleetpkg_get_sql_tables() first to understand the struct
 	}, t.executeQuery)
 }
 
+const (
+	toolGetSQLTables    = "fleetpkg_get_sql_tables"
+	toolExecuteSQLQuery = "fleetpkg_execute_sql_query"
+)
+
 func (t *tools) getSQLTables(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+	start := time.Now()
 	schemas := strings.Join(t.tables, "\n")
+	t.metrics.RecordToolCall(ctx, toolGetSQLTables, true, time.Since(start))
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: schemas},
@@ -67,24 +79,42 @@ type ExecuteQueryArgs struct {
 }
 
 func (t *tools) executeQuery(ctx context.Context, req *mcp.CallToolRequest, args ExecuteQueryArgs) (*mcp.CallToolResult, any, error) {
+	start := time.Now()
+	success := false
+	defer func() {
+		t.metrics.RecordToolCall(ctx, toolExecuteSQLQuery, success, time.Since(start))
+	}()
+
 	db := t.db.Load()
 	if db == nil {
-		t.log.WarnContext(ctx, "Database not ready yet")
+		t.log.WarnContext(ctx, "Query failed",
+			slog.String("statement", args.Statement),
+			slog.String("error", "database not ready"),
+			slog.Duration("duration", time.Since(start)))
+		t.metrics.RecordError(ctx, "db_not_ready")
 		return mcpErrorf("database is still initializing, please retry in a moment"), nil, nil
 	}
 
-	t.log.InfoContext(ctx, "Executing query", slog.String("statement", args.Statement))
-
 	rows, err := db.QueryContext(ctx, args.Statement)
 	if err != nil {
-		t.log.ErrorContext(ctx, "error executing query", slog.Any("error", err))
+		t.log.ErrorContext(ctx, "Query failed",
+			slog.String("statement", args.Statement),
+			slog.Any("error", err),
+			slog.Duration("duration", time.Since(start)))
+		t.metrics.RecordSQLQuery(ctx, false, time.Since(start))
+		t.metrics.RecordError(ctx, "sql_query")
 		return mcpErrorf("failed to execute query: %v", err), nil, nil
 	}
 	defer rows.Close()
 
 	columns, err := rows.Columns()
 	if err != nil {
-		t.log.ErrorContext(ctx, "Error getting columns", slog.Any("error", err))
+		t.log.ErrorContext(ctx, "Query failed",
+			slog.String("statement", args.Statement),
+			slog.Any("error", err),
+			slog.Duration("duration", time.Since(start)))
+		t.metrics.RecordSQLQuery(ctx, false, time.Since(start))
+		t.metrics.RecordError(ctx, "sql_columns")
 		return mcpErrorf("failed to get columns: %v", err), nil, nil
 	}
 
@@ -97,7 +127,12 @@ func (t *tools) executeQuery(ctx context.Context, req *mcp.CallToolRequest, args
 		}
 
 		if err := rows.Scan(pointers...); err != nil {
-			t.log.ErrorContext(ctx, "Error scanning row", slog.Any("error", err))
+			t.log.ErrorContext(ctx, "Query failed",
+				slog.String("statement", args.Statement),
+				slog.Any("error", err),
+				slog.Duration("duration", time.Since(start)))
+			t.metrics.RecordSQLQuery(ctx, false, time.Since(start))
+			t.metrics.RecordError(ctx, "sql_scan")
 			return mcpErrorf("failed to scan row: %v", err), nil, nil
 		}
 
@@ -115,11 +150,21 @@ func (t *tools) executeQuery(ctx context.Context, req *mcp.CallToolRequest, args
 
 	jsonRows, err := json.Marshal(result)
 	if err != nil {
-		t.log.ErrorContext(ctx, "Error marshaling results", slog.Any("error", err))
+		t.log.ErrorContext(ctx, "Query failed",
+			slog.String("statement", args.Statement),
+			slog.Any("error", err),
+			slog.Duration("duration", time.Since(start)))
+		t.metrics.RecordSQLQuery(ctx, false, time.Since(start))
+		t.metrics.RecordError(ctx, "json_marshal")
 		return mcpErrorf("failed to marshal result: %v", err), nil, nil
 	}
 
-	t.log.InfoContext(ctx, "Query executed successfully", slog.Int("row_count", len(result)))
+	success = true
+	t.metrics.RecordSQLQuery(ctx, true, time.Since(start))
+	t.log.InfoContext(ctx, "Query executed",
+		slog.String("statement", args.Statement),
+		slog.Int("row_count", len(result)),
+		slog.Duration("duration", time.Since(start)))
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: string(jsonRows)},
