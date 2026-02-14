@@ -11,72 +11,57 @@ import (
 	"runtime/debug"
 	"time"
 
+	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/contrib/instrumentation/host"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
-	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 )
 
 const (
-	serviceName = "fleetpkg-mcp"
+	defaultServiceName = "fleetpkg-mcp"
 )
 
-// SetupMetrics initializes the OpenTelemetry metrics pipeline based on
-// the OTEL_METRICS_EXPORTER environment variable.
+// SetupMetrics initializes the OpenTelemetry metrics pipeline.
 //
-// Supported values:
-//   - "" or "none": No metrics (returns no-op shutdown)
-//   - "console": Outputs metrics to stdout (for development)
-//   - "otlp": Exports metrics via OTLP HTTP (for production)
+// Metrics are only enabled when OTEL_METRICS_EXPORTER is explicitly set
+// to a value other than "none". The autoexport package handles exporter
+// selection based on standard OTel environment variables (e.g.,
+// OTEL_EXPORTER_OTLP_PROTOCOL for gRPC vs HTTP).
 //
 // Returns a shutdown function that should be called on application exit.
 func SetupMetrics(ctx context.Context) (shutdown func(context.Context) error, err error) {
-	exporter := os.Getenv("OTEL_METRICS_EXPORTER")
+	exporterEnv := os.Getenv("OTEL_METRICS_EXPORTER")
 
-	// Default to no metrics if not configured.
-	if exporter == "" || exporter == "none" {
+	// Quiet Opt-In: Only initialize if the user explicitly set an exporter.
+	// This prevents OTel from defaulting to 'otlp' and logging connection errors.
+	if exporterEnv == "" || exporterEnv == "none" {
 		return func(context.Context) error { return nil }, nil
 	}
 
-	// Build resource with service info.
-	version := getServiceVersion()
+	// Use autoexport to create a metric reader based on standard OTel env vars
+	// (e.g., OTEL_EXPORTER_OTLP_PROTOCOL for gRPC vs HTTP).
+	reader, err := autoexport.NewMetricReader(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create metric reader: %w", err)
+	}
+
+	// Build resource with service info. Standard OTel env vars
+	// (OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES) are picked up
+	// automatically by resource.Default().
 	res, err := resource.Merge(
 		resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceName(serviceName),
-			semconv.ServiceVersion(version),
+			semconv.ServiceName(defaultServiceName),
+			semconv.ServiceVersion(getServiceVersion()),
 		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
-
-	// Create exporter based on configuration.
-	var metricExporter metric.Exporter
-	switch exporter {
-	case "console":
-		metricExporter, err = stdoutmetric.New()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create console exporter: %w", err)
-		}
-	case "otlp":
-		metricExporter, err = otlpmetrichttp.New(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create OTLP exporter: %w", err)
-		}
-	default:
-		return nil, fmt.Errorf("unsupported OTEL_METRICS_EXPORTER value: %q (supported: none, console, otlp)", exporter)
-	}
-
-	// Create periodic reader for the exporter.
-	reader := metric.NewPeriodicReader(metricExporter,
-		metric.WithInterval(30*time.Second),
-	)
 
 	// Create and register the meter provider.
 	provider := metric.NewMeterProvider(
