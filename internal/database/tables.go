@@ -60,10 +60,10 @@ CREATE TABLE IF NOT EXISTS data_streams (
     dataset TEXT, -- dataset name
     dataset_is_prefix BOOLEAN, -- whether dataset is a prefix
     ilm_policy TEXT, -- ILM policy name
-    release TEXT, -- release information
+    release TEXT, -- stability of the release (e.g. beta, experimental)
     title TEXT NOT NULL, -- title of the data stream
     type TEXT, -- type of the data stream
-    elasticsearch_index_mode TEXT, -- index mode setting
+    elasticsearch_index_mode TEXT, -- index mode setting, Use 'time_series' for time series data stream (TSDS).
     elasticsearch_source_mode TEXT, -- source mode setting
     elasticsearch_dynamic_dataset BOOLEAN, -- dynamic dataset setting
     elasticsearch_dynamic_namespace BOOLEAN, -- dynamic namespace setting
@@ -80,7 +80,7 @@ const StreamsTableStatement = `-- Individual streams within data stream manifest
 CREATE TABLE IF NOT EXISTS streams (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- unique identifier
     data_stream_id INTEGER NOT NULL, -- foreign key to data_streams table
-    input TEXT NOT NULL, -- input type
+    input TEXT NOT NULL, -- input type (e.g. logfile, aws-s3, aws/metrics, cel, httpjson)
     description TEXT NOT NULL, -- description of the stream
     title TEXT NOT NULL, -- title of the stream
     template_path TEXT, -- path to the template
