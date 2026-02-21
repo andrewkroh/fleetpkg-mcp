@@ -66,6 +66,40 @@ func TestWritePackages(t *testing.T) {
 	}
 }
 
+func TestDataStreamFieldsInsertedWithoutStreams(t *testing.T) {
+	// Verify that fields are inserted for data streams that have no
+	// streams (inputs). This was a regression where fields were only
+	// inserted inside the streams loop.
+	pkg, err := fleetpkg.Read("testdata/test_pkg")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	if err = WritePackages(t.Context(), db, []fleetpkg.Integration{*pkg}); err != nil {
+		t.Fatal(err)
+	}
+
+	var count int
+	err = db.QueryRowContext(t.Context(), `
+		SELECT count(*)
+		FROM data_stream_fields dsf
+		JOIN data_streams ds ON ds.id = dsf.data_stream_id
+		WHERE ds.name = 'no_streams'
+	`).Scan(&count)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Fatalf("expected 2 fields for data stream without streams, got %d", count)
+	}
+}
+
 func loadPackages(log *slog.Logger, integrationsDir string) ([]fleetpkg.Integration, error) {
 	// Load packages from disk.
 	packages, err := filepath.Glob(filepath.Join(integrationsDir, "packages/*"))

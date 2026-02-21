@@ -1,0 +1,9 @@
+name: test_pkg
+title: Test Package
+version: 1.0.0
+description: A test package.
+type: integration
+format_version: 3.0.0
+owner:
+  github: elastic/test
+  type: elastic

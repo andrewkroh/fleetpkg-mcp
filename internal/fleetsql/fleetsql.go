@@ -306,31 +306,31 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 					return err
 				}
 			}
+		}
 
-			// Data stream fields.
-			flat, err := fleetpkg.FlattenFields(ds.AllFields())
+		// Data stream fields.
+		flat, err := fleetpkg.FlattenFields(ds.AllFields())
+		if err != nil {
+			return err
+		}
+		for _, f := range flat {
+			var externalDef *ecs.Field
+			if f.External == "ecs" && in.Build != nil && in.Build.Dependencies.ECS.Reference != "" {
+				externalDef, _ = ecs.Lookup(f.Name, strings.TrimPrefix(in.Build.Dependencies.ECS.Reference, "git@"))
+			}
+
+			fieldID, err := insertField(ctx, q, &f, externalDef)
 			if err != nil {
 				return err
 			}
-			for _, f := range flat {
-				var externalDef *ecs.Field
-				if f.External == "ecs" && in.Build != nil && in.Build.Dependencies.ECS.Reference != "" {
-					externalDef, _ = ecs.Lookup(f.Name, strings.TrimPrefix(in.Build.Dependencies.ECS.Reference, "git@"))
-				}
 
-				fieldID, err := insertField(ctx, q, &f, externalDef)
-				if err != nil {
-					return err
-				}
-
-				err = q.InsertDataStreamField(ctx, database.InsertDataStreamFieldParams{
-					DataStreamID:   dsID,
-					FieldID:        fieldID,
-					FieldsFileName: filepath.Base(f.FileMetadata.Path()),
-				})
-				if err != nil {
-					return err
-				}
+			err = q.InsertDataStreamField(ctx, database.InsertDataStreamFieldParams{
+				DataStreamID:   dsID,
+				FieldID:        fieldID,
+				FieldsFileName: filepath.Base(f.FileMetadata.Path()),
+			})
+			if err != nil {
+				return err
 			}
 		}
 
@@ -463,10 +463,14 @@ func insertPackage(ctx context.Context, db *sql.DB, in *fleetpkg.Integration) (e
 
 		// Changelog releases.
 		for _, release := range in.Changelog.Releases {
+			var date string
+			if release.Date != nil {
+				date = release.Date.Format(time.RFC3339)
+			}
 			releaseID, err := q.InsertRelease(ctx, database.InsertReleaseParams{
 				ChangelogID: changelogID,
 				Version:     release.Version,
-				Date:        release.Date.Format(time.RFC3339),
+				Date:        date,
 				FilePath:    release.Path(),
 				LineNumber:  int64(release.Line()),
 				Col:         int64(release.Column()),
