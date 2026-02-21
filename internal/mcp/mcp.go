@@ -78,7 +78,12 @@ type ExecuteQueryArgs struct {
 	Statement string `json:"statement" jsonschema:"SQLite query to execute"`
 }
 
+const queryTimeout = 10 * time.Second
+
 func (t *tools) executeQuery(ctx context.Context, req *mcp.CallToolRequest, args ExecuteQueryArgs) (*mcp.CallToolResult, any, error) {
+	ctx, cancel := context.WithTimeout(ctx, queryTimeout)
+	defer cancel()
+
 	start := time.Now()
 	success := false
 	defer func() {
