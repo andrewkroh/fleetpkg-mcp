@@ -16,18 +16,22 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/andrewkroh/go-fleetpkg"
+	"github.com/andrewkroh/go-ecs"
+	"github.com/andrewkroh/go-package-spec/pkgreader"
+	"github.com/andrewkroh/go-package-spec/pkgspec"
+	"github.com/andrewkroh/go-package-spec/pkgsql"
 	"github.com/gorilla/handlers"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/andrewkroh/fleetpkg-mcp/internal/fleetsql"
 	fleetmcp "github.com/andrewkroh/fleetpkg-mcp/internal/mcp"
 	"github.com/andrewkroh/fleetpkg-mcp/internal/otelsetup"
 	"github.com/andrewkroh/fleetpkg-mcp/internal/slogutil"
@@ -120,7 +124,7 @@ func run(integrationsDir string) error {
 		Title:   "Elastic Fleet Integration Package metadata MCP server",
 		Version: modVer + " (" + vcsRef + ")",
 	}, nil)
-	fleetmcp.AddTools(s, fleetsql.TableSchemas(), dbPtr, log, metrics)
+	fleetmcp.AddTools(s, pkgsql.TableSchemas(), dbPtr, log, metrics)
 
 	// Track database file path for cleanup.
 	var dbPath string
@@ -410,21 +414,15 @@ func initializeDatabase(ctx context.Context, log *slog.Logger, integrationsDir s
 		return nil, "", fmt.Errorf("failed to get database path: %w", err)
 	}
 
-	// Read packages from the integrations repo.
-	pkgs, err := loadPackages(log, integrationsDir)
-	if err != nil {
-		return nil, dbPath, fmt.Errorf("failed to load packages: %w", err)
-	}
-
 	// Create a new DB (each process has its own file, so no need to remove).
 	db, err := sql.Open("sqlite", "file:"+dbPath)
 	if err != nil {
 		return nil, dbPath, fmt.Errorf("failed to open new database: %w", err)
 	}
 
-	if err = fleetsql.WritePackages(ctx, db, pkgs); err != nil {
+	if err = buildDatabase(ctx, log, db, integrationsDir); err != nil {
 		db.Close()
-		return nil, dbPath, fmt.Errorf("failed to write packages to DB: %w", err)
+		return nil, dbPath, fmt.Errorf("failed to build database: %w", err)
 	}
 	if err = db.Close(); err != nil {
 		return nil, dbPath, fmt.Errorf("failed to close database: %w", err)
@@ -443,12 +441,6 @@ func initializeDatabase(ctx context.Context, log *slog.Logger, integrationsDir s
 // It returns a new read-only database connection.
 // Uses a temporary file and atomic rename to ensure the database file always exists.
 func refreshDatabase(ctx context.Context, log *slog.Logger, dbPath, integrationsDir string) (*sql.DB, error) {
-	// Read packages from the integrations repo.
-	pkgs, err := loadPackages(log, integrationsDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load packages: %w", err)
-	}
-
 	// Write to a temporary file first.
 	tmpPath := dbPath + ".tmp"
 	if err := os.Remove(tmpPath); err != nil && !os.IsNotExist(err) {
@@ -460,10 +452,10 @@ func refreshDatabase(ctx context.Context, log *slog.Logger, dbPath, integrations
 		return nil, fmt.Errorf("failed to open temp database: %w", err)
 	}
 
-	if err = fleetsql.WritePackages(ctx, db, pkgs); err != nil {
+	if err = buildDatabase(ctx, log, db, integrationsDir); err != nil {
 		db.Close()
 		os.Remove(tmpPath)
-		return nil, fmt.Errorf("failed to write packages to DB: %w", err)
+		return nil, fmt.Errorf("failed to build database: %w", err)
 	}
 	if err = db.Close(); err != nil {
 		os.Remove(tmpPath)
@@ -574,66 +566,116 @@ func ensureGitRepo(ctx context.Context, log *slog.Logger, dir string) error {
 	return gitPullRepo(ctx, log, dir)
 }
 
-// loadPackages loads integration packages from the specified directory.
-// It returns a slice of Integration structs or an error if loading fails.
-func loadPackages(log *slog.Logger, integrationsDir string) ([]fleetpkg.Integration, error) {
-	packages, err := filepath.Glob(filepath.Join(integrationsDir, "packages/*"))
+// buildDatabase creates tables, reads packages via a bounded worker pool,
+// writes each to the DB as it arrives, and rebuilds FTS indexes at the end.
+// The bounded results channel keeps memory usage low by only buffering a
+// limited number of packages at a time.
+func buildDatabase(ctx context.Context, log *slog.Logger, db *sql.DB, integrationsDir string) error {
+	packagesDir := filepath.Join(integrationsDir, "packages")
+	entries, err := os.ReadDir(packagesDir)
 	if err != nil {
-		return nil, err
-	}
-	if len(packages) == 0 {
-		return nil, fmt.Errorf("no packages found in %s", integrationsDir)
+		return fmt.Errorf("reading packages directory: %w", err)
 	}
 
-	// Use bounded concurrency based on GOMAXPROCS
-	workers := runtime.GOMAXPROCS(0)
+	// Create tables.
+	for _, ddl := range pkgsql.TableSchemas() {
+		if _, err := db.ExecContext(ctx, ddl); err != nil {
+			return fmt.Errorf("creating tables: %w", err)
+		}
+	}
+
+	// Reader options shared by all packages.
+	baseOpts := []pkgreader.Option{
+		pkgreader.WithGitMetadata(),
+		pkgreader.WithImageMetadata(),
+		pkgreader.WithTestConfigs(),
+		pkgreader.WithAgentTemplates(),
+	}
+
+	// Use more workers than CPUs since package reading is I/O bound
+	// (git blame subprocess, file reads).
+	workers := 4 * runtime.NumCPU()
+
 	type result struct {
-		integration fleetpkg.Integration
-		err         error
+		pkg  *pkgreader.Package
+		name string
+		err  error
 	}
 
-	jobs := make(chan string, len(packages))
-	results := make(chan result, len(packages))
+	work := make(chan string, workers)
+	results := make(chan result, workers)
 
-	// Start worker pool
 	var wg sync.WaitGroup
-	for i := 0; i < workers; i++ {
+	for range workers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for pkgPath := range jobs {
-				p, err := fleetpkg.Read(pkgPath, fleetpkg.WithChangelogDates())
-				if err != nil {
-					results <- result{err: err}
-					return
-				}
-				results <- result{integration: *p}
+			for name := range work {
+				pkgPath := filepath.Join(packagesDir, name)
+				opts := append(baseOpts, pkgreader.WithPathPrefix(path.Join("packages", name)))
+				pkg, err := pkgreader.Read(pkgPath, opts...)
+				results <- result{pkg: pkg, name: name, err: err}
 			}
 		}()
 	}
 
-	// Send jobs
-	for _, pkgPath := range packages {
-		jobs <- pkgPath
-	}
-	close(jobs)
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
 
-	// Wait for all workers to finish
-	wg.Wait()
-	close(results)
-
-	// Collect results
-	integrations := make([]fleetpkg.Integration, 0, len(packages))
-	for res := range results {
-		if res.err != nil {
-			return nil, res.err
+	go func() {
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			work <- entry.Name()
 		}
-		integrations = append(integrations, res.integration)
+		close(work)
+	}()
+
+	// Consume results and write to DB one at a time.
+	var loaded int
+	for r := range results {
+		if r.err != nil {
+			return fmt.Errorf("reading package %s: %w", r.name, r.err)
+		}
+
+		writeOpts := []pkgsql.Option{pkgsql.WithDocContent(pkgsql.OSDocReader)}
+		if opt := ecsLookupForPackage(r.pkg); opt != nil {
+			writeOpts = append(writeOpts, opt)
+		}
+		if err := pkgsql.WritePackage(ctx, db, r.pkg, writeOpts...); err != nil {
+			return fmt.Errorf("writing package %s: %w", r.name, err)
+		}
+		loaded++
 	}
 
-	log.Info("Discovered packages", slog.Int("count", len(integrations)))
+	log.Info("Loaded packages", slog.Int("count", loaded))
 
-	return integrations, nil
+	// Rebuild FTS indexes after all writes.
+	return pkgsql.RebuildFTS(ctx, db)
+}
+
+// ecsLookupForPackage returns a pkgsql.Option that resolves ECS field
+// references for a package, or nil if the package has no ECS dependency.
+func ecsLookupForPackage(pkg *pkgreader.Package) pkgsql.Option {
+	if pkg.Build == nil || pkg.Build.Dependencies.ECS.Reference == "" {
+		return nil
+	}
+	ref := strings.TrimPrefix(pkg.Build.Dependencies.ECS.Reference, "git@")
+	return pkgsql.WithECSLookup(func(name string) *pkgspec.ECSFieldDefinition {
+		field, _ := ecs.Lookup(name, ref)
+		if field == nil {
+			return nil
+		}
+		return &pkgspec.ECSFieldDefinition{
+			DataType:    field.DataType,
+			Description: field.Description,
+			Pattern:     field.Pattern,
+			Array:       field.Array,
+		}
+	})
 }
 
 // userContextMiddleware extracts user information from HTTP headers
