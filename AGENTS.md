@@ -24,11 +24,12 @@ queries, and package reading logic are provided by the
 1. Ensure the code compiles: `go build ./...`
 2. Run static analysis: `go vet ./...`
 3. Run tests: `go test ./...`
+4. Run formatter: `gofumpt -w -extra .' from (`go install mvdan.cc/gofumpt@latest`)
 4. Test the MCP server manually if needed
 
 ## Commit instructions
 
 - Use conventional commit style messages.
 - Minimize the use of bulleted lists.
-- Do not attribute the changes to Claude.
 - Follow the 50/72 rule where the title is 50 characters max and body lines are 72 chars max.
+
