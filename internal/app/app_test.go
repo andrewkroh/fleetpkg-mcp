@@ -2,7 +2,7 @@
 // Elasticsearch B.V. licenses this file to you under the Apache 2.0 License.
 // See the LICENSE file in the project root for more information.
 
-package main
+package app_test
 
 import (
 	"context"
@@ -15,6 +15,8 @@ import (
 	"runtime/pprof"
 	"testing"
 
+	"github.com/andrewkroh/fleetpkg-mcp/internal/app"
+
 	_ "modernc.org/sqlite"
 )
 
@@ -26,7 +28,7 @@ func threadCount() int {
 	return pprof.Lookup("threadcreate").Count()
 }
 
-// TestBuildDatabaseGoroutineLeak runs buildDatabase repeatedly and checks
+// TestBuildDatabaseGoroutineLeak runs BuildDatabase repeatedly and checks
 // that goroutines don't grow, catching leaks from workers, producers, or
 // waiters that fail to exit.
 func TestBuildDatabaseGoroutineLeak(t *testing.T) {
@@ -36,7 +38,7 @@ func TestBuildDatabaseGoroutineLeak(t *testing.T) {
 
 	// Warm up: run once to stabilize runtime goroutines (GC, finalizers, etc).
 	db := openTestDB(t)
-	if err := buildDatabase(ctx, log, db, dir); err != nil {
+	if err := app.BuildDatabase(ctx, log, db, dir); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()
@@ -52,7 +54,7 @@ func TestBuildDatabaseGoroutineLeak(t *testing.T) {
 
 	for i := range iterations {
 		db := openTestDB(t)
-		if err := buildDatabase(ctx, log, db, dir); err != nil {
+		if err := app.BuildDatabase(ctx, log, db, dir); err != nil {
 			t.Fatalf("iteration %d: %v", i, err)
 		}
 		db.Close()
@@ -72,7 +74,7 @@ func TestBuildDatabaseGoroutineLeak(t *testing.T) {
 }
 
 // TestBuildDatabaseGoroutineLeak_WithErrors verifies that goroutines don't
-// leak even when buildDatabase encounters read errors (e.g. malformed packages).
+// leak even when BuildDatabase encounters read errors (e.g. malformed packages).
 func TestBuildDatabaseGoroutineLeak_WithErrors(t *testing.T) {
 	dir := createTestIntegrationsWithBadPkg(t)
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
@@ -80,7 +82,7 @@ func TestBuildDatabaseGoroutineLeak_WithErrors(t *testing.T) {
 
 	// Warm up.
 	db := openTestDB(t)
-	_ = buildDatabase(ctx, log, db, dir)
+	_ = app.BuildDatabase(ctx, log, db, dir)
 	db.Close()
 
 	runtime.GC()
@@ -93,7 +95,7 @@ func TestBuildDatabaseGoroutineLeak_WithErrors(t *testing.T) {
 
 	for range iterations {
 		db := openTestDB(t)
-		_ = buildDatabase(ctx, log, db, dir) // Errors expected.
+		_ = app.BuildDatabase(ctx, log, db, dir) // Errors expected.
 		db.Close()
 	}
 
@@ -119,14 +121,14 @@ func TestRefreshDatabaseThreadLeak(t *testing.T) {
 	ctx := context.Background()
 
 	// Initialize.
-	db, dbPath, err := initializeDatabase(ctx, log, dir)
+	db, dbPath, err := app.InitializeDatabase(ctx, log, dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	db.Close()
 
 	// Warm up with one refresh to stabilize thread count.
-	db, err = refreshDatabase(ctx, log, dbPath, dir)
+	db, err = app.RefreshDatabase(ctx, log, dbPath, dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +144,7 @@ func TestRefreshDatabaseThreadLeak(t *testing.T) {
 	const iterations = 10
 
 	for i := range iterations {
-		db, err = refreshDatabase(ctx, log, dbPath, dir)
+		db, err = app.RefreshDatabase(ctx, log, dbPath, dir)
 		if err != nil {
 			t.Fatalf("refresh iteration %d: %v", i, err)
 		}
@@ -198,7 +200,7 @@ func createTestIntegrations(t *testing.T) string {
 }
 
 // createTestIntegrationsWithBadPkg creates an integrations directory containing
-// both valid and invalid packages, so buildDatabase will encounter errors.
+// both valid and invalid packages, so BuildDatabase will encounter errors.
 func createTestIntegrationsWithBadPkg(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()

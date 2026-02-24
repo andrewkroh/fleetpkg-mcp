@@ -1,145 +1,52 @@
 # fleetpkg-mcp
 
-`fleetpkg-mcp` is a Model Context Protocol (MCP) server that enables 
-LLMs to query low-level metadata about Elastic Fleet integration packages.
+`fleetpkg-mcp` is a Model Context Protocol (MCP) server that enables
+LLMs to query metadata about Elastic Fleet integration packages.
 It loads metadata from a local copy of the `elastic/integrations` repository
-into a SQLite database and exposes SQL query capabilities to the LLM through the
+into a SQLite database and exposes query capabilities through the
 Model Context Protocol.
-
-Each time the MCP is started, it will rebuild the database. This takes about 10
-seconds on a fast machine.
 
 ## Features
 
-- Scans and indexes all Elastic Fleet integration packages from your local `elastic/integrations` repository
-- Creates a queryable SQLite database with comprehensive package metadata
-- Exposes readonly database access to LLMs through the Model Context Protocol
-- Enables AI assistants to answer detailed questions about Elastic Fleet integrations
+- Indexes all Elastic Fleet packages (integration, input, and content) from your local `elastic/integrations` repository
+- Creates a queryable SQLite database with comprehensive package metadata including fields, pipelines, transforms, variables, and test configurations
+- Full-text search over package documentation (READMEs, guides, knowledge base articles) and changelog entries using SQLite FTS5 with porter stemming
+- Exposes four MCP tools: schema discovery, arbitrary SQL queries, doc search, and changelog search
+- Periodic background refresh with optional `git pull` to keep data current
+- Kubernetes-ready with `/healthz` and `/readyz` health check endpoints
 
 ## Installation
 
-### Install from source
+Requires [Go](https://go.dev/dl/). No install step needed — MCP clients run it directly with `go run`.
 
-```bash
-go install github.com/andrewkroh/fleetpkg-mcp@latest
-```
-
-This will install the binary to your `$GOPATH/bin` directory (typically `~/go/bin`).
-
-### Run without installing
-
-You can also run the server directly without installing:
-
-```bash
-go run github.com/andrewkroh/fleetpkg-mcp@main -dir /path/to/integrations
-```
-
-### Run with Docker
+### Docker
 
 The Docker image includes git and automatically clones the integrations repository on first run. It listens on HTTP port 8080 and refreshes every 24 hours by default:
 
 ```bash
-# Run with defaults (auto-clone, HTTP on port 8080, 24h refresh)
-docker run -p 8080:8080 -v fleetpkg-data:/data \
-  ghcr.io/andrewkroh/fleetpkg-mcp:latest
-
-# Custom refresh interval (e.g., every hour)
 docker run -p 8080:8080 -v fleetpkg-data:/data \
   -e FLEETPKG_MCP_REFRESH_INTERVAL=1h \
   ghcr.io/andrewkroh/fleetpkg-mcp:latest
-
-# Disable automatic refresh
-docker run -p 8080:8080 -v fleetpkg-data:/data \
-  -e FLEETPKG_MCP_REFRESH_INTERVAL= \
-  ghcr.io/andrewkroh/fleetpkg-mcp:latest
-
-# Custom port
-docker run -p 9090:9090 -v fleetpkg-data:/data \
-  ghcr.io/andrewkroh/fleetpkg-mcp:latest \
-  -dir /data/integrations -git-pull -http 0.0.0.0:9090
 ```
-
-Default behavior:
-- Auto-clones the repository on first run (via `-git-pull` flag)
-- Pulls updates and refreshes database every 24 hours (via `FLEETPKG_MCP_REFRESH_INTERVAL=24h`)
-- Listens on HTTP at `0.0.0.0:8080`
-- Stores data in `/data/integrations`
 
 #### Environment Variables
 
-- `FLEETPKG_MCP_REFRESH_INTERVAL`: Duration between automatic refreshes (e.g., `1h`, `30m`, `24h`). Defaults to `24h`. Set to empty string to disable automatic refresh.
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `FLEETPKG_MCP_REFRESH_INTERVAL` | Duration between automatic database refreshes (e.g., `1h`, `30m`, `24h`). Set to empty string to disable. | `24h` |
+| `FLEETPKG_MCP_PPROF_ADDR` | Address for the pprof debug HTTP server (e.g., `0.0.0.0:6060`). Disabled if empty. | (disabled) |
 
 ## MCP Server Setup
 
-The `fleetpkg-mcp` server can be configured as an MCP server in your AI
-assistant. The server requires the `-dir` argument pointing to your local
-checkout of the [elastic/integrations](https://github.com/elastic/integrations)
-repository.
+The server requires a local checkout of the [elastic/integrations](https://github.com/elastic/integrations) repository.
 
-### Claude Desktop Setup
-
-#### Using stdio transport (recommended)
-
-Add the server using the Claude CLI:
+### Claude Code / Claude Desktop
 
 ```bash
-claude mcp add --scope user fleetpkg -- /Users/<USERNAME>/go/bin/fleetpkg-mcp -dir /path/to/integrations
-```
-
-Or manually add to your Claude Desktop configuration file:
-
-```json
-{
-  "mcpServers": {
-    "fleetpkg": {
-      "command": "/Users/<USERNAME>/go/bin/fleetpkg-mcp",
-      "args": [
-        "-dir",
-        "/path/to/integrations"
-      ]
-    }
-  }
-}
-```
-
-To remove:
-
-```bash
-claude mcp remove fleetpkg
-```
-
-#### Using HTTP transport
-
-First, start the server in HTTP mode:
-
-```bash
-fleetpkg-mcp -dir /path/to/integrations -http 127.0.0.1:1234
-```
-
-Then add the HTTP endpoint to Claude Desktop:
-
-```bash
-claude mcp add --scope user --transport http fleetpkg http://127.0.0.1:1234
+claude mcp add --scope user fleetpkg -- go run github.com/andrewkroh/fleetpkg-mcp@latest -dir /path/to/integrations
 ```
 
 ### Other MCP Clients
-
-For other MCP-compatible clients, use one of these configuration formats:
-
-#### With installed binary
-
-```json
-{
-  "mcpServers": {
-    "fleetpkg": {
-      "command": "/path/to/fleetpkg-mcp",
-      "args": ["-dir", "/path/to/integrations"]
-    }
-  }
-}
-```
-
-#### With go run
 
 ```json
 {
@@ -148,7 +55,7 @@ For other MCP-compatible clients, use one of these configuration formats:
       "command": "go",
       "args": [
         "run",
-        "github.com/andrewkroh/fleetpkg-mcp@main",
+        "github.com/andrewkroh/fleetpkg-mcp@latest",
         "-dir",
         "/path/to/integrations"
       ]
@@ -157,70 +64,92 @@ For other MCP-compatible clients, use one of these configuration formats:
 }
 ```
 
-## CLI Usage
+### HTTP Transport
 
-The server can be run directly from the command line for testing or HTTP mode:
+For HTTP-based clients, start the server separately then point your client at the URL:
 
 ```bash
-# Basic usage with stdio (for MCP)
-fleetpkg-mcp -dir /path/to/integrations
-
-# HTTP mode (for HTTP-based MCP clients)
-fleetpkg-mcp -dir /path/to/integrations -http 127.0.0.1:1234
-
-# With custom log level
-fleetpkg-mcp -dir /path/to/integrations -log-level debug
-
-# Disable logging
-fleetpkg-mcp -dir /path/to/integrations -no-log
-
-# Show version
-fleetpkg-mcp -version
+go run github.com/andrewkroh/fleetpkg-mcp@latest -dir /path/to/integrations -http 127.0.0.1:8080
 ```
 
-### Arguments
+## MCP Tools
 
-#### Required
+| Tool | Description |
+|------|-------------|
+| `fleetpkg_get_sql_tables` | Returns the complete catalog of available tables and columns. Call this first. |
+| `fleetpkg_execute_sql_query` | Executes an arbitrary read-only SQLite query. |
+| `fleetpkg_search_docs` | Full-text search across package documentation. Supports FTS5 syntax: phrases, prefix matching, and boolean operators. |
+| `fleetpkg_search_changelogs` | Full-text search across changelog entries. Same FTS5 syntax support. |
 
-- `-dir <path>`: Path to your local checkout of the [elastic/integrations](https://github.com/elastic/integrations) repository.
+## CLI Flags
 
-#### Optional
+### Required
 
-- `-http <address>`: Listen for HTTP connections at the specified address instead of using stdin/stdout. Example: `127.0.0.1:1234`
-- `-git-pull`: Automatically clone and update the elastic/integrations repository. When enabled:
-  - Clones `https://github.com/elastic/integrations` if the directory doesn't exist or is empty
-  - Runs `git pull --ff-only` if the directory already contains a git repository
-  - Updates before each periodic refresh (if `-refresh` is also set)
-  - Uses shallow clone (`--depth=1`) for faster initial download
-- `-refresh <duration>`: Periodically refresh the database at the specified interval (e.g., `1h`, `30m`). Falls back to `FLEETPKG_MCP_REFRESH_INTERVAL` environment variable if not set. Works well with `-git-pull` to keep data up to date
-- `-log-level <level>`: Set log level. Options: `debug`, `info`, `warn`, `error`. Default: `info`
-- `-no-log`: Disable all logging output
-- `-version`: Print version information and exit
+| Flag | Description |
+|------|-------------|
+| `-dir <path>` | Path to your local checkout of the [elastic/integrations](https://github.com/elastic/integrations) repository |
+
+### Optional
+
+| Flag | Description |
+|------|-------------|
+| `-http <address>` | Listen for HTTP connections at the specified address instead of using stdin/stdout (e.g., `127.0.0.1:8080`) |
+| `-pprof <address>` | Start a pprof debug HTTP server at the specified address (e.g., `127.0.0.1:6060`) |
+| `-git-pull` | Clone the repository if missing, or `git pull --ff-only` if it exists. Updates before each periodic refresh |
+| `-refresh <duration>` | Periodically refresh the database (e.g., `1h`, `30m`). Falls back to `FLEETPKG_MCP_REFRESH_INTERVAL` env var |
+| `-log-level <level>` | Log level: `debug`, `info`, `warn`, `error` (default: `info`) |
+| `-no-log` | Disable all logging output |
+| `-version` | Print version information and exit |
 
 ## Database Schema
 
-The SQLite database contains information about Fleet integrations including:
+The database is built by [go-package-spec/pkgsql](https://github.com/andrewkroh/go-package-spec/tree/main/pkgsql), which reads packages using `pkgreader` and writes them into a self-documenting SQLite schema. For the complete schema, see [schema.sql](https://github.com/andrewkroh/go-package-spec/blob/main/pkgsql/internal/db/schema.sql).
 
-- **Integrations**: Core metadata about each package (name, version, type, description, ownership)
-- **Policy Templates**: Configuration templates for deploying integrations with deployment modes
-- **Data Streams**: Information about the data streams each integration produces
-- **Fields**: Detailed field definitions from fields.yml files with ECS mappings
-- **Transforms**: Data transformation configurations with pivot and latest operations
-- **Variables**: Configuration variables for customizing integrations with options for select types
-- **Ingest Pipelines**: Elasticsearch ingest pipeline configurations
-- **Ingest Processors**: Individual processors within pipelines including nested on_failure handlers
-- **Sample Events**: Example event data for data streams
-- **Icons and Screenshots**: Visual assets for integrations and policy templates with image metadata
-- **Discovery Fields**: Package discovery capability metadata
-- **Build Manifests**: Build configuration and ECS dependencies
-- **Changelogs**: Version history with releases and individual changes
-- **Categories**: Categorization for integrations and policy templates
+### Tables
 
-For the complete database schema, see [schema.sql](internal/database/schema.sql).
+| Table | Description |
+|-------|-------------|
+| `packages` | Core metadata (name, version, type, description, ownership) for integration, input, and content packages |
+| `policy_templates` | Configuration templates with deployment modes (default, agentless) |
+| `policy_template_inputs` | Inputs defined within policy templates |
+| `policy_template_categories` | Categories assigned to policy templates |
+| `policy_template_icons` | Icon definitions for policy templates |
+| `policy_template_screenshots` | Screenshot definitions for policy templates |
+| `data_streams` | Data streams with Elasticsearch and agent configuration |
+| `streams` | Individual streams (inputs) within data streams |
+| `fields` | Elasticsearch field definitions, flattened from nested YAML into dotted-path names with ECS resolution |
+| `data_stream_fields` | Join table linking fields to data streams |
+| `package_fields` | Join table linking fields to packages (for input packages) |
+| `transform_fields` | Join table linking fields to transforms |
+| `transforms` | Elasticsearch transform configurations with pivot, latest, source, and destination settings |
+| `vars` | Input variable definitions with type, default value, and validation |
+| `package_vars` | Join table linking vars to packages |
+| `policy_template_vars` | Join table linking vars to policy templates |
+| `policy_template_input_vars` | Join table linking vars to policy template inputs |
+| `stream_vars` | Join table linking vars to streams |
+| `ingest_pipelines` | Elasticsearch ingest pipeline definitions within data streams |
+| `ingest_processors` | Individual processors flattened from pipelines, including nested on_failure handlers |
+| `sample_events` | Example event data for data streams |
+| `images` | Image file metadata (dimensions, size, SHA-256) from the `img/` directory |
+| `package_icons` | Icon definitions for packages |
+| `package_screenshots` | Screenshot definitions for packages |
+| `docs` | Documentation files (READMEs, guides, knowledge base articles) with optional content |
+| `docs_fts` | FTS5 full-text search index over doc content |
+| `changelogs` | Changelog versions with release dates (via git blame) |
+| `changelog_entries` | Individual changelog entries with description, type, and link |
+| `changelog_entries_fts` | FTS5 full-text search index over changelog descriptions |
+| `package_categories` | Categories assigned to packages |
+| `discovery_fields` | Package discovery capability metadata |
+| `build_manifests` | Build configuration and ECS dependencies |
+| `tags` | Kibana tags associated with packages |
+| `deprecations` | Deprecation notices for packages, policy templates, inputs, data streams, and vars |
+| `routing_rules` | Routing rules for rerouting documents from a source dataset |
+| `pipeline_tests` | Pipeline test cases for data streams |
+| `system_tests` | System test cases for data streams and input packages |
+| `static_tests` | Static test cases for data streams |
+| `policy_tests` | Policy test cases for data streams and input packages |
 
-## Example Conversation
-
-Here's an example of how you can use this server with an LLM to answer questions about Elastic Fleet integrations:
+## Example Conversations
 
 > **Q**: Use the fleetpkg tools to answer: What integrations configure a pivot type transform?
 >
@@ -249,7 +178,7 @@ Here's an example of how you can use this server with an LLM to answer questions
 > **Q**: Use the fleetpkg tools to answer the following question. What integration
 > data streams define a 'resource' field? And what are the data types of the
 > fields?
-> 
+>
 > **A**: The following integration data streams define a 'resource' field of type 'keyword':
 >
 > - endace > flow
@@ -283,18 +212,18 @@ Here's an example of how you can use this server with an LLM to answer questions
 > - Total screenshots: 932
 > - Correct size values: 169 (18.13%)
 > - Incorrect size values: 763 (81.87%)
-> 
+>
 > Analysis
-> 
+>
 > Only 18.13% of screenshots have the correct 'size' column value that matches the computed dimensions from the width and height columns. This means that 81.87% of the screenshots have mismatched or incorrect size specifications.
-> 
+>
 > Common Issues Found
-> 
+>
 > Looking at the sample data, I can see several types of mismatches:
-> 
+>
 > 1. Placeholder values: Many screenshots have size="600x600" when the actual dimensions are different (e.g., 1920x1080, 1899x2069, 1920x1233)
 > 2. Scaled/resized values: Screenshots show evidence of being resized - the size column contains smaller dimensions than the actual image dimensions (e.g., size shows 1896x961 but actual is 2880x1800)
-> 3. Character encoding issues: At least one case shows size="1608×2692" (using × instead of x) while computed is "1608x2692"
+> 3. Character encoding issues: At least one case shows size="1608x2692" (using x instead of x) while computed is "1608x2692"
 > 4. Minor width discrepancies: Some have small differences in width (e.g., size="1280x1329" vs computed "1268x1329")
 
 ----
@@ -311,7 +240,7 @@ Here's an example of how you can use this server with an LLM to answer questions
 >
 > **Q**: What are the top 5 teams responsible for the packages using 'set' with
 > a Mustache template instead of 'copy_from'?
-> 
+>
 > **A**:
 > Here are the top 5 teams using 'set' with a Mustache template instead of 'copy_from':
 >
