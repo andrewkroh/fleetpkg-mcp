@@ -132,6 +132,7 @@ func Run(cfg Config) error {
 		Version: modVer + " (" + vcsRef + ")",
 	}, nil)
 	fleetmcp.AddTools(s, pkgsql.TableSchemas(), dbPtr, log, metrics)
+	fleetmcp.AddPrompts(s)
 
 	// Track database file path for cleanup.
 	var dbPath string
