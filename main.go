@@ -259,7 +259,26 @@ func run(integrationsDir string) error {
 
 	// Listen over HTTP.
 	if *httpAddr != "" {
-		var handler http.Handler = mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server { return s }, nil)
+		mcpHandler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server { return s }, nil)
+
+		// Register health check and MCP endpoints.
+		mux := http.NewServeMux()
+		mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("ok\n"))
+		})
+		mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
+			if dbPtr.Load() == nil {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				w.Write([]byte("database not ready\n"))
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("ok\n"))
+		})
+		mux.Handle("/", mcpHandler)
+
+		var handler http.Handler = mux
 
 		listener, err := net.Listen("tcp", *httpAddr)
 		if err != nil {
@@ -274,7 +293,7 @@ func run(integrationsDir string) error {
 			slog.String("addr", "http://"+listener.Addr().String()))
 
 		// Add middleware chain (innermost to outermost):
-		// 1. MCP handler (innermost)
+		// 1. Mux with health checks + MCP handler (innermost)
 		// 2. User context middleware (extracts headers)
 		// 3. Metrics middleware (records request metrics)
 		// 4. Logging handler (outermost, optional)
