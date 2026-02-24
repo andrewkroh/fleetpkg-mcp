@@ -2,7 +2,7 @@ You have access to a set of tools for exploring Elastic Fleet integration packag
 
 ## Overview
 
-The tools provide access to a SQLite database containing metadata for every Elastic integration package. The database includes: manifests, policy templates, data streams, fields (with ECS resolution), ingest pipelines and processors, transforms, input variables, documentation, changelogs, sample events, images, screenshots, test configurations, routing rules, deprecation notices, build manifests, and tags.
+The tools provide access to a SQLite database containing metadata for every Elastic integration package. The database includes: manifests, policy templates, data streams, fields (with ECS resolution), ingest pipelines and processors, transforms, input variables, Kibana saved objects, security detection rules (with MITRE ATT&CK mappings), documentation, changelogs, agent templates, sample events, images, screenshots, test configurations, routing rules, deprecation notices, build manifests, and tags.
 
 There are two main use cases: **discovery** (finding which packages relate to a topic) and **analytics** (analyzing patterns across all packages).
 
@@ -10,6 +10,7 @@ There are two main use cases: **discovery** (finding which packages relate to a 
 
 - **fleetpkg_search_docs** — Full-text search across package documentation. Supports FTS5 syntax: phrases ("log rotation"), prefix (authent*), and boolean operators (SSL AND certificate).
 - **fleetpkg_search_changelogs** — Full-text search across changelog entries.
+- **fleetpkg_search_security_rules** — Full-text search across security detection rules (title, description, detection query, setup guide, investigation notes).
 - **fleetpkg_get_sql_tables** — Returns the complete database schema with all table definitions, columns, and types.
 - **fleetpkg_execute_sql_query** — Executes arbitrary read-only SQLite queries. The most powerful tool for both discovery and analytics.
 
@@ -17,7 +18,7 @@ There are two main use cases: **discovery** (finding which packages relate to a 
 
 When you don't know the exact package name, start with full-text search:
 
-1. Use `fleetpkg_search_docs` or `fleetpkg_search_changelogs` to find relevant packages
+1. Use `fleetpkg_search_docs`, `fleetpkg_search_changelogs`, or `fleetpkg_search_security_rules` to find relevant packages
 2. Use the returned package names in targeted SQL queries to get details
 
 Example: "What integrations handle AWS CloudTrail?" → search docs for "AWS CloudTrail" → find the `aws` package → query its data streams, fields, and pipelines.
@@ -35,6 +36,8 @@ Examples:
 - What teams own the most packages?
 - Which data streams define a 'resource' field and what are their data types?
 - What percentage of screenshot metadata has correct dimensions?
+- What security detection rules utilize Okta integration data? (via `security_rule_related_integrations`)
+- What security rules monitor `logs-aws*` index patterns? (via `security_rule_index_patterns`)
 
 ## Tips
 
@@ -42,4 +45,5 @@ Examples:
 - Use SQL aggregations to get summary statistics across all packages
 - The `fields` table has flattened dotted-path field names with resolved ECS definitions
 - The `ingest_processors` table has flattened processor definitions including nested `on_failure` handlers
+- Security rules link to `kibana_saved_objects` for title/description, with child tables for index patterns, MITRE threats, tags, required fields, and related integrations
 - The docs FTS index uses porter stemming, so "authenticate" also matches "authentication"

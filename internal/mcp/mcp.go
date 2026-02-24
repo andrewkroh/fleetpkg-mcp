@@ -78,13 +78,25 @@ Returns matching changelog entries with package name, version, change type, desc
 			ReadOnlyHint:   true,
 		},
 	}, t.searchChangelogs)
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "fleetpkg_search_security_rules",
+		Description: `Full-text search across security detection rules (title, description, query, setup guide, investigation note).
+Uses FTS5 with porter stemming — supports phrases ("credential access"), prefix (powershell*), and boolean operators (AND/OR/NOT).
+Returns matching rules with package name, rule ID, type, severity, risk score, title, and description, sorted by relevance.`,
+		Annotations: &mcp.ToolAnnotations{
+			IdempotentHint: true,
+			ReadOnlyHint:   true,
+		},
+	}, t.searchSecurityRules)
 }
 
 const (
-	toolGetSQLTables     = "fleetpkg_get_sql_tables"
-	toolExecuteSQLQuery  = "fleetpkg_execute_sql_query"
-	toolSearchDocs       = "fleetpkg_search_docs"
-	toolSearchChangelogs = "fleetpkg_search_changelogs"
+	toolGetSQLTables          = "fleetpkg_get_sql_tables"
+	toolExecuteSQLQuery       = "fleetpkg_execute_sql_query"
+	toolSearchDocs            = "fleetpkg_search_docs"
+	toolSearchChangelogs      = "fleetpkg_search_changelogs"
+	toolSearchSecurityRules   = "fleetpkg_search_security_rules"
 )
 
 func (t *tools) getSQLTables(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
@@ -261,6 +273,37 @@ WHERE changelog_entries_fts MATCH ?`
 	queryArgs = append(queryArgs, limit)
 
 	return t.queryJSON(ctx, toolSearchChangelogs, stmt, queryArgs...)
+}
+
+type SearchSecurityRulesArgs struct {
+	Query       string `json:"query" jsonschema:"FTS5 search query (e.g. \"credential access\", powershell*, persistence AND registry)"`
+	PackageName string `json:"package_name,omitempty" jsonschema:"Optional package name to restrict search to a single package"`
+	Limit       int    `json:"limit,omitempty" jsonschema:"Maximum number of results to return (default 20)"`
+}
+
+func (t *tools) searchSecurityRules(ctx context.Context, req *mcp.CallToolRequest, args SearchSecurityRulesArgs) (*mcp.CallToolResult, any, error) {
+	limit := args.Limit
+	if limit <= 0 {
+		limit = defaultFTSLimit
+	}
+
+	stmt := `SELECT p.name AS package_name, sr.rule_id, sr.type, sr.severity, sr.risk_score,
+kso.title, kso.description
+FROM security_rules_fts
+JOIN security_rules sr ON sr.id = security_rules_fts.rowid
+JOIN kibana_saved_objects kso ON kso.id = sr.kibana_saved_objects_id
+JOIN packages p ON p.id = kso.packages_id
+WHERE security_rules_fts MATCH ?`
+
+	queryArgs := []any{args.Query}
+	if args.PackageName != "" {
+		stmt += "\nAND p.name = ?"
+		queryArgs = append(queryArgs, args.PackageName)
+	}
+	stmt += "\nGROUP BY sr.rule_id\nORDER BY rank\nLIMIT ?"
+	queryArgs = append(queryArgs, limit)
+
+	return t.queryJSON(ctx, toolSearchSecurityRules, stmt, queryArgs...)
 }
 
 // queryJSON executes a parameterized query, marshals results to JSON, and
