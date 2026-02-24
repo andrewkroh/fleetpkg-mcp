@@ -636,9 +636,15 @@ func buildDatabase(ctx context.Context, log *slog.Logger, db *sql.DB, integratio
 
 	// Consume results and write to DB one at a time.
 	var loaded int
+	var firstErr error
 	for r := range results {
+		if firstErr != nil {
+			// Drain remaining results so worker and waiter goroutines can exit.
+			continue
+		}
 		if r.err != nil {
-			return fmt.Errorf("reading package %s: %w", r.name, r.err)
+			firstErr = fmt.Errorf("reading package %s: %w", r.name, r.err)
+			continue
 		}
 
 		writeOpts := []pkgsql.Option{pkgsql.WithDocContent(pkgsql.OSDocReader)}
@@ -646,9 +652,13 @@ func buildDatabase(ctx context.Context, log *slog.Logger, db *sql.DB, integratio
 			writeOpts = append(writeOpts, opt)
 		}
 		if err := pkgsql.WritePackage(ctx, db, r.pkg, writeOpts...); err != nil {
-			return fmt.Errorf("writing package %s: %w", r.name, err)
+			firstErr = fmt.Errorf("writing package %s: %w", r.name, err)
+			continue
 		}
 		loaded++
+	}
+	if firstErr != nil {
+		return firstErr
 	}
 
 	log.Info("Loaded packages", slog.Int("count", loaded))
