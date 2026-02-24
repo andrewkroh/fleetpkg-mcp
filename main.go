@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -42,6 +43,7 @@ import (
 
 var (
 	httpAddr        = flag.String("http", "", "listen for HTTP at this address, instead of stdin/stdout")
+	pprofAddr       = flag.String("pprof", "", "listen for pprof debug HTTP at this address (e.g., 127.0.0.1:6060)")
 	noLog           = flag.Bool("no-log", false, "if set, disables logging")
 	logLevel        = flag.String("log-level", "info", "log level (debug, info, warn, error)")
 	integrationsDir = flag.String("dir", "", "path to elastic/integrations directory")
@@ -113,6 +115,26 @@ func run(integrationsDir string) error {
 	metrics, err := otelsetup.NewMetrics()
 	if err != nil {
 		return fmt.Errorf("failed to create metrics: %w", err)
+	}
+
+	// Start pprof debug server if requested.
+	if *pprofAddr != "" {
+		pprofMux := http.NewServeMux()
+		pprofMux.HandleFunc("/debug/pprof/", pprof.Index)
+		pprofMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		pprofMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		pprofMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		pprofMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		pprofListener, err := net.Listen("tcp", *pprofAddr)
+		if err != nil {
+			return fmt.Errorf("failed to listen for pprof on %q: %w", *pprofAddr, err)
+		}
+		go func() {
+			<-ctx.Done()
+			pprofListener.Close()
+		}()
+		go http.Serve(pprofListener, pprofMux)
+		log.Info("pprof debug server listening", slog.String("addr", "http://"+pprofListener.Addr().String()+"/debug/pprof/"))
 	}
 
 	// Create atomic DB pointer for lazy initialization
