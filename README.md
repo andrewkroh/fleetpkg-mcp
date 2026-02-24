@@ -10,8 +10,8 @@ Model Context Protocol.
 
 - Indexes all Elastic Fleet packages (integration, input, and content) from your local `elastic/integrations` repository
 - Creates a queryable SQLite database with comprehensive package metadata including fields, pipelines, transforms, variables, and test configurations
-- Full-text search over package documentation (READMEs, guides, knowledge base articles) and changelog entries using SQLite FTS5 with porter stemming
-- Exposes four MCP tools: schema discovery, arbitrary SQL queries, doc search, and changelog search
+- Full-text search over package documentation, changelog entries, and security detection rules using SQLite FTS5 with porter stemming
+- Exposes five MCP tools: schema discovery, arbitrary SQL queries, doc search, changelog search, and security rule search
 - Periodic background refresh with optional `git pull` to keep data current
 - Kubernetes-ready with `/healthz` and `/readyz` health check endpoints
 
@@ -80,6 +80,7 @@ go run github.com/andrewkroh/fleetpkg-mcp@latest -dir /path/to/integrations -htt
 | `fleetpkg_execute_sql_query` | Executes an arbitrary read-only SQLite query. |
 | `fleetpkg_search_docs` | Full-text search across package documentation. Supports FTS5 syntax: phrases, prefix matching, and boolean operators. |
 | `fleetpkg_search_changelogs` | Full-text search across changelog entries. Same FTS5 syntax support. |
+| `fleetpkg_search_security_rules` | Full-text search across security detection rules (title, description, query, setup, investigation notes). |
 
 ## CLI Flags
 
@@ -117,6 +118,7 @@ The database is built by [go-package-spec/pkgsql](https://github.com/andrewkroh/
 | `policy_template_screenshots` | Screenshot definitions for policy templates |
 | `data_streams` | Data streams with Elasticsearch and agent configuration |
 | `streams` | Individual streams (inputs) within data streams |
+| `agent_templates` | Agent Handlebars template files (.yml.hbs) with raw content |
 | `fields` | Elasticsearch field definitions, flattened from nested YAML into dotted-path names with ECS resolution |
 | `data_stream_fields` | Join table linking fields to data streams |
 | `package_fields` | Join table linking fields to packages (for input packages) |
@@ -129,6 +131,15 @@ The database is built by [go-package-spec/pkgsql](https://github.com/andrewkroh/
 | `stream_vars` | Join table linking vars to streams |
 | `ingest_pipelines` | Elasticsearch ingest pipeline definitions within data streams |
 | `ingest_processors` | Individual processors flattened from pipelines, including nested on_failure handlers |
+| `kibana_saved_objects` | Kibana saved objects (dashboards, visualizations, security rules, etc.) from the `kibana/` directory |
+| `kibana_references` | References between Kibana saved objects, enabling dependency graph queries |
+| `security_rules` | Security detection rule attributes (query, severity, risk score, MITRE mappings) extracted from Kibana saved objects |
+| `security_rule_index_patterns` | Elasticsearch index patterns monitored by security rules |
+| `security_rule_tags` | Structured tags on security rules (Domain, OS, Tactic, Data Source) |
+| `security_rule_threats` | MITRE ATT&CK tactic and technique mappings for security rules |
+| `security_rule_related_integrations` | Integration packages related to security rules |
+| `security_rule_required_fields` | Fields required by security rules |
+| `security_rules_fts` | FTS5 full-text search index over security rule title, description, query, setup, and notes |
 | `sample_events` | Example event data for data streams |
 | `images` | Image file metadata (dimensions, size, SHA-256) from the `img/` directory |
 | `package_icons` | Icon definitions for packages |
