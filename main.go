@@ -415,10 +415,12 @@ func initializeDatabase(ctx context.Context, log *slog.Logger, integrationsDir s
 	}
 
 	// Create a new DB (each process has its own file, so no need to remove).
+	// SQLite only supports a single writer, so limit to one connection.
 	db, err := sql.Open("sqlite", "file:"+dbPath)
 	if err != nil {
 		return nil, dbPath, fmt.Errorf("failed to open new database: %w", err)
 	}
+	db.SetMaxOpenConns(1)
 
 	if err = buildDatabase(ctx, log, db, integrationsDir); err != nil {
 		db.Close()
@@ -428,11 +430,14 @@ func initializeDatabase(ctx context.Context, log *slog.Logger, integrationsDir s
 		return nil, dbPath, fmt.Errorf("failed to close database: %w", err)
 	}
 
-	// Open the database as read-only.
+	// Open the database as read-only. Limit the pool size so that
+	// locked OS threads are released promptly when this DB is closed
+	// during a refresh swap.
 	db, err = sql.Open("sqlite", "file:"+dbPath+"?mode=ro")
 	if err != nil {
 		return nil, dbPath, fmt.Errorf("failed to open database readonly: %w", err)
 	}
+	db.SetMaxOpenConns(4)
 
 	return db, dbPath, nil
 }
@@ -447,10 +452,12 @@ func refreshDatabase(ctx context.Context, log *slog.Logger, dbPath, integrations
 		return nil, fmt.Errorf("failed to remove existing temp database: %w", err)
 	}
 
+	// SQLite only supports a single writer, so limit to one connection.
 	db, err := sql.Open("sqlite", "file:"+tmpPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open temp database: %w", err)
 	}
+	db.SetMaxOpenConns(1)
 
 	if err = buildDatabase(ctx, log, db, integrationsDir); err != nil {
 		db.Close()
@@ -468,11 +475,14 @@ func refreshDatabase(ctx context.Context, log *slog.Logger, dbPath, integrations
 		return nil, fmt.Errorf("failed to replace database: %w", err)
 	}
 
-	// Open the database as read-only.
+	// Open the database as read-only. Limit the pool size so that
+	// locked OS threads are released promptly when this DB is closed
+	// during a refresh swap.
 	db, err = sql.Open("sqlite", "file:"+dbPath+"?mode=ro")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database readonly: %w", err)
 	}
+	db.SetMaxOpenConns(4)
 
 	return db, nil
 }
