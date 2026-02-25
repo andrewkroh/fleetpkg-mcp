@@ -131,7 +131,7 @@ func Run(cfg Config) error {
 		Title:   "Elastic Fleet Integration Package metadata MCP server",
 		Version: modVer + " (" + vcsRef + ")",
 	}, nil)
-	fleetmcp.AddTools(s, pkgsql.TableSchemas(), dbPtr, log, metrics)
+	fleetmcp.AddTools(s, append(pkgsql.TableSchemas(), ECSTableSchemas()...), dbPtr, log, metrics)
 	fleetmcp.AddPrompts(s)
 
 	// Track database file path for cleanup.

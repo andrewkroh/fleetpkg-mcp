@@ -155,7 +155,7 @@ func BuildDatabase(ctx context.Context, log *slog.Logger, db *sql.DB, integratio
 	}
 
 	// Create tables.
-	for _, ddl := range pkgsql.TableSchemas() {
+	for _, ddl := range append(pkgsql.TableSchemas(), ECSTableSchemas()...) {
 		if _, err := db.ExecContext(ctx, ddl); err != nil {
 			return fmt.Errorf("creating tables: %w", err)
 		}
@@ -240,8 +240,76 @@ func BuildDatabase(ctx context.Context, log *slog.Logger, db *sql.DB, integratio
 
 	log.Info("Loaded packages", slog.Int("count", loaded))
 
+	// Load ECS fields into the ecs_fields table.
+	if err := loadECSFields(ctx, db); err != nil {
+		return fmt.Errorf("loading ECS fields: %w", err)
+	}
+
 	// Rebuild FTS indexes after all writes.
 	return pkgsql.RebuildFTS(ctx, db)
+}
+
+const ecsFieldsTableSchema = `CREATE TABLE IF NOT EXISTS ecs_fields (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  data_type TEXT NOT NULL,
+  description TEXT NOT NULL,
+  is_array BOOLEAN NOT NULL DEFAULT FALSE,
+  pattern TEXT,
+  search_text TEXT NOT NULL
+);`
+
+const ecsFieldsFTSSchema = `CREATE VIRTUAL TABLE IF NOT EXISTS ecs_fields_fts USING fts5(
+  search_text,
+  content=ecs_fields,
+  content_rowid=id,
+  tokenize='porter unicode61'
+);`
+
+// ECSTableSchemas returns the DDL statements for the ECS fields tables.
+func ECSTableSchemas() []string {
+	return []string{ecsFieldsTableSchema, ecsFieldsFTSSchema}
+}
+
+// loadECSFields loads all fields from the latest ECS version into the
+// ecs_fields table and rebuilds the FTS index.
+func loadECSFields(ctx context.Context, db *sql.DB) error {
+	fields, err := ecs.Fields("")
+	if err != nil {
+		return fmt.Errorf("loading ECS fields: %w", err)
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("starting transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx,
+		`INSERT INTO ecs_fields (name, data_type, description, is_array, pattern, search_text)
+		VALUES (?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("preparing insert: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, f := range fields {
+		searchText := strings.ReplaceAll(f.Name, ".", " ") + " " + f.Description
+		var pattern *string
+		if f.Pattern != "" {
+			pattern = &f.Pattern
+		}
+		if _, err := stmt.ExecContext(ctx, f.Name, f.DataType, f.Description, f.Array, pattern, searchText); err != nil {
+			return fmt.Errorf("inserting ECS field %s: %w", f.Name, err)
+		}
+	}
+
+	// Rebuild the ECS fields FTS index.
+	if _, err := tx.ExecContext(ctx, `INSERT INTO ecs_fields_fts(ecs_fields_fts) VALUES('rebuild')`); err != nil {
+		return fmt.Errorf("rebuilding ECS fields FTS: %w", err)
+	}
+
+	return tx.Commit()
 }
 
 // ecsLookupForPackage returns a pkgsql.Option that resolves ECS field

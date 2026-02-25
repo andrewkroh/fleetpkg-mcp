@@ -10,8 +10,9 @@ Model Context Protocol.
 
 - Indexes all Elastic Fleet packages (integration, input, and content) from your local `elastic/integrations` repository
 - Creates a queryable SQLite database with comprehensive package metadata including fields, pipelines, transforms, variables, and test configurations
-- Full-text search over package documentation, changelog entries, and security detection rules using SQLite FTS5 with porter stemming
-- Exposes five MCP tools: schema discovery, arbitrary SQL queries, doc search, changelog search, and security rule search
+- Full-text search over package documentation, changelog entries, security detection rules, and ECS field definitions using SQLite FTS5 with porter stemming
+- ECS field discovery and matching — search ~1990 ECS fields by concept or check field names against ECS to identify `external: ecs` candidates
+- Exposes seven MCP tools: schema discovery, arbitrary SQL queries, doc search, changelog search, security rule search, ECS field search, and ECS field matching
 - Periodic background refresh with optional `git pull` to keep data current
 - Kubernetes-ready with `/healthz` and `/readyz` health check endpoints
 
@@ -81,6 +82,8 @@ go run github.com/andrewkroh/fleetpkg-mcp@latest -dir /path/to/integrations -htt
 | `fleetpkg_search_docs` | Full-text search across package documentation. Supports FTS5 syntax: phrases, prefix matching, and boolean operators. |
 | `fleetpkg_search_changelogs` | Full-text search across changelog entries. Same FTS5 syntax support. |
 | `fleetpkg_search_security_rules` | Full-text search across security detection rules (title, description, query, setup, investigation notes). |
+| `fleetpkg_search_ecs_fields` | Full-text search across ECS field definitions. Accepts plain keywords, dotted field names, or camelCase identifiers — automatically normalized for broad discovery. |
+| `fleetpkg_match_ecs_fields` | Check whether field names exist in ECS. Returns each annotated with match status, data type, and description. |
 
 ## CLI Flags
 
@@ -154,6 +157,8 @@ The database is built by [go-package-spec/pkgsql](https://github.com/andrewkroh/
 | `build_manifests` | Build configuration and ECS dependencies |
 | `tags` | Kibana tags associated with packages |
 | `deprecations` | Deprecation notices for packages, policy templates, inputs, data streams, and vars |
+| `ecs_fields` | ECS (Elastic Common Schema) field definitions from the latest version (~1990 fields) with name, data type, description, and FTS5 search text |
+| `ecs_fields_fts` | FTS5 full-text search index over ECS field names (tokenized) and descriptions |
 | `routing_rules` | Routing rules for rerouting documents from a source dataset |
 | `pipeline_tests` | Pipeline test cases for data streams |
 | `system_tests` | System test cases for data streams and input packages |

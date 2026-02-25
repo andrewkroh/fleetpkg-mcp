@@ -11,6 +11,8 @@ There are two main use cases: **discovery** (finding which packages relate to a 
 - **fleetpkg_search_docs** — Full-text search across package documentation. Supports FTS5 syntax: phrases ("log rotation"), prefix (authent*), and boolean operators (SSL AND certificate).
 - **fleetpkg_search_changelogs** — Full-text search across changelog entries.
 - **fleetpkg_search_security_rules** — Full-text search across security detection rules (title, description, detection query, setup guide, investigation notes).
+- **fleetpkg_search_ecs_fields** — Full-text search across ECS (Elastic Common Schema) field definitions. Accepts plain keywords, dotted field names, or camelCase identifiers — they are automatically split into search tokens. E.g., `crowdstrike.fdr.ProcessTTYAttached` finds `process.tty` and related fields.
+- **fleetpkg_match_ecs_fields** — Check whether field names exist in ECS. Given a list of dotted field names, returns each annotated with whether it's an ECS field, plus the ECS data type and description for matches.
 - **fleetpkg_get_sql_tables** — Returns the complete database schema with all table definitions, columns, and types.
 - **fleetpkg_execute_sql_query** — Executes arbitrary read-only SQLite queries. The most powerful tool for both discovery and analytics.
 
@@ -38,6 +40,14 @@ Examples:
 - What percentage of screenshot metadata has correct dimensions?
 - What security detection rules utilize Okta integration data? (via `security_rule_related_integrations`)
 - What security rules monitor `logs-aws*` index patterns? (via `security_rule_index_patterns`)
+
+## ECS Field Mapping Workflow
+
+When reviewing whether package fields align with ECS:
+
+1. **Discover** — Use `fleetpkg_search_ecs_fields` to find ECS fields related to a concept. For example, given a custom field like `crowdstrike.fdr.ProcessTTYAttached`, search for "process tty" or "terminal" to discover that `process.tty` exists in ECS.
+2. **Match** — Use `fleetpkg_match_ecs_fields` with a list of field names from a package to identify which ones already exist in ECS.
+3. **Recommend** — Fields that match ECS should use `external: ecs` in their field definition to inherit the upstream ECS definition and avoid drift.
 
 ## Tips
 
