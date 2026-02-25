@@ -92,11 +92,11 @@ Returns matching rules with package name, rule ID, type, severity, risk score, t
 }
 
 const (
-	toolGetSQLTables          = "fleetpkg_get_sql_tables"
-	toolExecuteSQLQuery       = "fleetpkg_execute_sql_query"
-	toolSearchDocs            = "fleetpkg_search_docs"
-	toolSearchChangelogs      = "fleetpkg_search_changelogs"
-	toolSearchSecurityRules   = "fleetpkg_search_security_rules"
+	toolGetSQLTables        = "fleetpkg_get_sql_tables"
+	toolExecuteSQLQuery     = "fleetpkg_execute_sql_query"
+	toolSearchDocs          = "fleetpkg_search_docs"
+	toolSearchChangelogs    = "fleetpkg_search_changelogs"
+	toolSearchSecurityRules = "fleetpkg_search_security_rules"
 )
 
 func (t *tools) getSQLTables(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
