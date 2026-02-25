@@ -254,6 +254,10 @@ func (t *tools) searchDocs(ctx context.Context, req *mcp.CallToolRequest, args S
 		limit = defaultFTSLimit
 	}
 
+	// Replace dots with spaces so dotted field names like "source.nat.ip"
+	// become valid FTS5 tokens instead of causing syntax errors.
+	query := sanitizeFTSQuery(args.Query)
+
 	stmt := `SELECT p.name AS package_name, d.content_type, d.file_path,
 snippet(docs_fts, 0, '>>>', '<<<', '...', 48) AS snippet
 FROM docs_fts
@@ -261,7 +265,7 @@ JOIN docs d ON d.id = docs_fts.rowid
 JOIN packages p ON p.id = d.packages_id
 WHERE docs_fts MATCH ?`
 
-	queryArgs := []any{args.Query}
+	queryArgs := []any{query}
 	if args.PackageName != "" {
 		stmt += "\nAND p.name = ?"
 		queryArgs = append(queryArgs, args.PackageName)
@@ -284,6 +288,8 @@ func (t *tools) searchChangelogs(ctx context.Context, req *mcp.CallToolRequest, 
 		limit = defaultFTSLimit
 	}
 
+	query := sanitizeFTSQuery(args.Query)
+
 	stmt := `SELECT p.name AS package_name, cl.version, ce.type, ce.description, ce.link
 FROM changelog_entries_fts
 JOIN changelog_entries ce ON ce.id = changelog_entries_fts.rowid
@@ -291,7 +297,7 @@ JOIN changelogs cl ON cl.id = ce.changelogs_id
 JOIN packages p ON p.id = cl.packages_id
 WHERE changelog_entries_fts MATCH ?`
 
-	queryArgs := []any{args.Query}
+	queryArgs := []any{query}
 	if args.PackageName != "" {
 		stmt += "\nAND p.name = ?"
 		queryArgs = append(queryArgs, args.PackageName)
@@ -314,6 +320,8 @@ func (t *tools) searchSecurityRules(ctx context.Context, req *mcp.CallToolReques
 		limit = defaultFTSLimit
 	}
 
+	query := sanitizeFTSQuery(args.Query)
+
 	stmt := `SELECT p.name AS package_name, sr.rule_id, sr.type, sr.severity, sr.risk_score,
 kso.title, kso.description
 FROM security_rules_fts
@@ -322,7 +330,7 @@ JOIN kibana_saved_objects kso ON kso.id = sr.kibana_saved_objects_id
 JOIN packages p ON p.id = kso.packages_id
 WHERE security_rules_fts MATCH ?`
 
-	queryArgs := []any{args.Query}
+	queryArgs := []any{query}
 	if args.PackageName != "" {
 		stmt += "\nAND p.name = ?"
 		queryArgs = append(queryArgs, args.PackageName)
@@ -345,10 +353,10 @@ func (t *tools) searchECSFields(ctx context.Context, req *mcp.CallToolRequest, a
 	}
 
 	// Normalize the query for FTS5 matching:
-	// 1. Replace dots with spaces (e.g. "crowdstrike.fdr.Name" → "crowdstrike fdr Name")
+	// 1. Sanitize (replace dots with spaces)
 	// 2. Split camelCase tokens (e.g. "ProcessTTYAttached" → "Process TTY Attached")
 	// 3. Join plain terms with OR for additive discovery ranking
-	query := strings.ReplaceAll(args.Query, ".", " ")
+	query := sanitizeFTSQuery(args.Query)
 	query = splitCamelCase(query)
 	query = implicitOR(query)
 
@@ -460,6 +468,7 @@ func (t *tools) matchECSFields(ctx context.Context, req *mcp.CallToolRequest, ar
 	t.metrics.RecordSQLQuery(ctx, true, time.Since(start))
 	t.log.InfoContext(ctx, "Query executed",
 		slog.String("tool", toolMatchECSFields),
+		slog.Any("field_names", args.FieldNames),
 		slog.Int("input_count", len(args.FieldNames)),
 		slog.Int("match_count", len(matched)),
 		slog.Duration("duration", time.Since(start)))
@@ -468,6 +477,13 @@ func (t *tools) matchECSFields(ctx context.Context, req *mcp.CallToolRequest, ar
 			&mcp.TextContent{Text: string(jsonData)},
 		},
 	}, nil, nil
+}
+
+// sanitizeFTSQuery replaces characters that cause FTS5 syntax errors
+// with spaces. Dots in particular are common in field names like
+// "source.nat.ip" and would otherwise cause "syntax error near '.'".
+func sanitizeFTSQuery(query string) string {
+	return strings.ReplaceAll(query, ".", " ")
 }
 
 // splitCamelCase splits camelCase and PascalCase tokens within a query
