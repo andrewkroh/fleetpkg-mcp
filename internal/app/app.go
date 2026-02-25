@@ -267,7 +267,12 @@ func Run(cfg Config) error {
 
 	// Listen over HTTP.
 	if cfg.HTTPAddr != "" {
-		mcpHandler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server { return s }, nil)
+		mcpHandler := mcp.NewStreamableHTTPHandler(
+			func(r *http.Request) *mcp.Server { return s },
+			&mcp.StreamableHTTPOptions{
+				SessionTimeout: 10 * time.Minute,
+			},
+		)
 
 		// Register health check and MCP endpoints.
 		mux := http.NewServeMux()
