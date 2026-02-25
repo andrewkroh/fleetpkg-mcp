@@ -2,8 +2,9 @@ FROM alpine:3.23
 ARG TARGETOS
 ARG TARGETARCH
 
-# Install git and required packages
-RUN apk add --no-cache git ca-certificates tzdata
+# Install git, tini, and required packages.
+# tini runs as PID 1 to reap orphaned zombie child processes.
+RUN apk add --no-cache git ca-certificates tzdata tini
 
 # Create non-root user matching distroless nonroot UID
 RUN adduser -D -u 65532 -h /home/fleetpkg fleetpkg
@@ -25,6 +26,6 @@ ENV FLEETPKG_MCP_REFRESH_INTERVAL=24h
 # Expose HTTP port
 EXPOSE 8080
 
-# Binary as ENTRYPOINT, default args in CMD
-ENTRYPOINT ["/fleetpkg-mcp"]
+# Use tini as PID 1 to reap zombie child processes.
+ENTRYPOINT ["/sbin/tini", "--", "/fleetpkg-mcp"]
 CMD ["-dir", "/data/integrations", "-git-pull", "-http", "0.0.0.0:8080"]
