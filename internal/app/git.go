@@ -14,17 +14,26 @@ import (
 	"time"
 )
 
+// gitEnv returns environment variables for running git commands in
+// automated/containerized environments. It disables interactive prompts
+// and automatic garbage collection (which can fork background processes
+// that become zombies when the Go process runs as PID 1).
+func gitEnv() []string {
+	return append(os.Environ(),
+		"GIT_TERMINAL_PROMPT=0",                // Disable HTTPS credential prompts.
+		"GIT_SSH_COMMAND=ssh -o BatchMode=yes", // Disable SSH passphrase/password prompts.
+		"GIT_CONFIG_COUNT=1",                   // Disable gc to prevent zombie child processes.
+		"GIT_CONFIG_KEY_0=gc.auto",
+		"GIT_CONFIG_VALUE_0=0",
+	)
+}
+
 // gitPullRepo runs 'git pull --ff-only' in the given directory.
-// Environment variables are set to prevent any interactive prompts that
-// would block in an automated/containerized environment.
 func gitPullRepo(ctx context.Context, log *slog.Logger, dir string) error {
 	log.Info("Running git pull...", slog.String("dir", dir))
 	start := time.Now()
 	cmd := exec.CommandContext(ctx, "git", "-C", dir, "pull", "--ff-only")
-	cmd.Env = append(os.Environ(),
-		"GIT_TERMINAL_PROMPT=0",                // Disable HTTPS credential prompts.
-		"GIT_SSH_COMMAND=ssh -o BatchMode=yes", // Disable SSH passphrase/password prompts.
-	)
+	cmd.Env = gitEnv()
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git pull failed: %w: %s", err, output)
@@ -50,10 +59,7 @@ func gitCloneRepo(ctx context.Context, log *slog.Logger, dir string) error {
 		"--no-tags",
 		"https://github.com/elastic/integrations.git",
 		dir)
-	cmd.Env = append(os.Environ(),
-		"GIT_TERMINAL_PROMPT=0",
-		"GIT_SSH_COMMAND=ssh -o BatchMode=yes",
-	)
+	cmd.Env = gitEnv()
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
