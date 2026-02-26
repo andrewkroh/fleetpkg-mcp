@@ -1,7 +1,7 @@
 github.com/andrewkroh/go-ecs v0.0.0-20260204044457-2d67483e976a h1:97PBoqqEQzZGvZFwfYm6bLpIgzj55beJXrGq/15F5xo=
 github.com/andrewkroh/go-ecs v0.0.0-20260204044457-2d67483e976a/go.mod h1:MDEnOCgOILh8aBc6rhhUiWPyws1aoNxXw/NY/J5oen8=
-github.com/andrewkroh/go-package-spec v0.0.0-20260225144618-61dbcc708874 h1:7KisC9DQUT9kCZ3u+9L0bm7vaWPSf5LKtQ34jJFIGVw=
-github.com/andrewkroh/go-package-spec v0.0.0-20260225144618-61dbcc708874/go.mod h1:VYFYfQkXOAe7RIOtSSUNfB6k7bn7An3IKRxfJvTvA8g=
+github.com/andrewkroh/go-package-spec v0.0.0-20260226233412-507d7b7dfd56 h1:JOeFOpeSn5za0JNIVF4Ft1SrlpUWCI5Y3MUwAZtoEIM=
+github.com/andrewkroh/go-package-spec v0.0.0-20260226233412-507d7b7dfd56/go.mod h1:VYFYfQkXOAe7RIOtSSUNfB6k7bn7An3IKRxfJvTvA8g=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/cenkalti/backoff/v5 v5.0.3 h1:ZN+IMa753KfX5hd8vVaMixjnqRZ3y8CuJKRKj1xcsSM=
@@ -152,8 +152,8 @@ golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa h1:Zt3DZoOFFYkKhDT3v7Lm9FDME
 golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa/go.mod h1:K79w1Vqn7PoiZn+TkNpx3BUWUQksGO3JcVX6qIjytmA=
 golang.org/x/mod v0.33.0 h1:tHFzIWbBifEmbwtGz65eaWyGiGZatSrT9prnU8DbVL8=
 golang.org/x/mod v0.33.0/go.mod h1:swjeQEj+6r7fODbD2cqrnje9PnziFuw4bmLbBZFrQ5w=
-golang.org/x/net v0.50.0 h1:ucWh9eiCGyDR3vtzso0WMQinm2Dnt8cFMuQa9K33J60=
-golang.org/x/net v0.50.0/go.mod h1:UgoSli3F/pBgdJBHCTc+tp3gmrU4XswgGRgtnwWTfyM=
+golang.org/x/net v0.51.0 h1:94R/GTO7mt3/4wIKpcR5gkGmRLOuE/2hNGeWq/GBIFo=
+golang.org/x/net v0.51.0/go.mod h1:aamm+2QF5ogm02fjy5Bb7CQ0WMt1/WVM7FtyaTLlA9Y=
 golang.org/x/oauth2 v0.35.0 h1:Mv2mzuHuZuY2+bkyWXIHMfhNdJAdwW3FuWeCPYN5GVQ=
 golang.org/x/oauth2 v0.35.0/go.mod h1:lzm5WQJQwKZ3nwavOZ3IS5Aulzxi68dUSgRHujetwEA=
 golang.org/x/sync v0.19.0 h1:vV+1eWNmZ5geRlYjzm2adRgW2/mcpevXNg50YZtPCE4=
