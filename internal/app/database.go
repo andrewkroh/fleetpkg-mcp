@@ -167,6 +167,7 @@ func BuildDatabase(ctx context.Context, log *slog.Logger, db *sql.DB, integratio
 		pkgreader.WithImageMetadata(),
 		pkgreader.WithTestConfigs(),
 		pkgreader.WithAgentTemplates(),
+		pkgreader.WithCodeowners(filepath.Join(integrationsDir, ".github", "CODEOWNERS")),
 	}
 
 	// Use more workers than CPUs since package reading is I/O bound
