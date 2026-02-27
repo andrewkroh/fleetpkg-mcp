@@ -270,7 +270,7 @@ func Run(cfg Config) error {
 		mcpHandler := mcp.NewStreamableHTTPHandler(
 			func(r *http.Request) *mcp.Server { return s },
 			&mcp.StreamableHTTPOptions{
-				SessionTimeout: 10 * time.Minute,
+				SessionTimeout: 1 * time.Hour,
 			},
 		)
 
