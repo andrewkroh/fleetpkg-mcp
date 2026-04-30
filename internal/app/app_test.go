@@ -110,6 +110,51 @@ func TestBuildDatabaseGoroutineLeak_WithErrors(t *testing.T) {
 	}
 }
 
+// TestBuildDatabaseNestedLayout verifies that BuildDatabase discovers
+// packages laid out under nested technology directories and records their
+// full repo-relative paths in the database.
+func TestBuildDatabaseNestedLayout(t *testing.T) {
+	dir := createTestIntegrationsNested(t)
+	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	ctx := context.Background()
+
+	db := openTestDB(t)
+	defer db.Close()
+
+	if err := app.BuildDatabase(ctx, log, db, dir); err != nil {
+		t.Fatalf("BuildDatabase: %v", err)
+	}
+
+	// All three packages — flat and nested — must be loaded.
+	var count int
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM packages").Scan(&count); err != nil {
+		t.Fatalf("counting packages: %v", err)
+	}
+	if count != 3 {
+		t.Errorf("loaded packages count = %d, want 3", count)
+	}
+
+	// Each package's manifest file_path must reflect its full repo-relative
+	// location, not just the leaf directory.
+	want := map[string]string{
+		"aws":                         "packages/aws/manifest.yml",
+		"microsoft_defender_endpoint": "packages/microsoft/defender_endpoint/manifest.yml",
+		"microsoft_sentinel":          "packages/microsoft/sentinel/manifest.yml",
+	}
+	for name, wantPath := range want {
+		var got sql.NullString
+		err := db.QueryRowContext(ctx,
+			"SELECT file_path FROM packages WHERE name = ?", name).Scan(&got)
+		if err != nil {
+			t.Errorf("querying package %s: %v", name, err)
+			continue
+		}
+		if got.String != wantPath {
+			t.Errorf("package %s file_path = %q, want %q", name, got.String, wantPath)
+		}
+	}
+}
+
 // TestRefreshDatabaseThreadLeak simulates the full init+refresh cycle and
 // checks that OS threads don't grow. modernc.org/sqlite calls
 // runtime.LockOSThread() per connection, so uncapped connection pools cause
@@ -192,9 +237,27 @@ func openTestDB(t *testing.T) *sql.DB {
 func createTestIntegrations(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	for i := range 3 {
-		createMinimalPackage(t, dir, i)
+	names := []string{"alpha", "beta", "gamma"}
+	for _, name := range names {
+		createMinimalPackage(t, dir, name, name)
 	}
+	initGitRepo(t, dir)
+	return dir
+}
+
+// createTestIntegrationsNested creates an integrations directory mixing the
+// flat (packages/<name>/) and nested (packages/<group>/<name>/) layouts that
+// elastic/integrations now allows.
+func createTestIntegrationsNested(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+
+	// Flat package.
+	createMinimalPackage(t, dir, "aws", "aws")
+	// Nested packages under a technology group.
+	createMinimalPackage(t, dir, "microsoft_defender_endpoint", filepath.Join("microsoft", "defender_endpoint"))
+	createMinimalPackage(t, dir, "microsoft_sentinel", filepath.Join("microsoft", "sentinel"))
+
 	initGitRepo(t, dir)
 	return dir
 }
@@ -206,7 +269,7 @@ func createTestIntegrationsWithBadPkg(t *testing.T) string {
 	dir := t.TempDir()
 
 	// One valid package.
-	createMinimalPackage(t, dir, 0)
+	createMinimalPackage(t, dir, "alpha", "alpha")
 
 	// One bad package: has a directory but no manifest.yml.
 	badPkg := filepath.Join(dir, "packages", "bad_package")
@@ -235,12 +298,15 @@ func initGitRepo(t *testing.T, dir string) {
 	}
 }
 
-func createMinimalPackage(t *testing.T, dir string, index int) {
+// createMinimalPackage writes a minimal valid package at
+// packages/<relPath>/. relPath may contain separators to exercise the nested
+// layout (e.g. "microsoft/defender_endpoint"). The manifest's name field is
+// set independently to keep names globally unique even when directory names
+// repeat.
+func createMinimalPackage(t *testing.T, dir, name, relPath string) {
 	t.Helper()
 
-	names := []string{"alpha", "beta", "gamma"}
-	name := names[index%len(names)]
-	pkgDir := filepath.Join(dir, "packages", name)
+	pkgDir := filepath.Join(dir, "packages", relPath)
 
 	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
 		t.Fatal(err)

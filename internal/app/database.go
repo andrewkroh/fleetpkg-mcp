@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -149,9 +148,9 @@ func RefreshDatabase(ctx context.Context, log *slog.Logger, dbPath, integrations
 // limited number of packages at a time.
 func BuildDatabase(ctx context.Context, log *slog.Logger, db *sql.DB, integrationsDir string) error {
 	packagesDir := filepath.Join(integrationsDir, "packages")
-	entries, err := os.ReadDir(packagesDir)
+	pkgPaths, err := pkgreader.ListPackages(packagesDir)
 	if err != nil {
-		return fmt.Errorf("reading packages directory: %w", err)
+		return fmt.Errorf("listing packages: %w", err)
 	}
 
 	// Create tables.
@@ -188,11 +187,16 @@ func BuildDatabase(ctx context.Context, log *slog.Logger, db *sql.DB, integratio
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for name := range work {
-				pkgPath := filepath.Join(packagesDir, name)
-				opts := append(baseOpts, pkgreader.WithPathPrefix(path.Join("packages", name)))
+			for pkgPath := range work {
+				rel, err := filepath.Rel(integrationsDir, pkgPath)
+				if err != nil {
+					results <- result{name: pkgPath, err: err}
+					continue
+				}
+				prefix := filepath.ToSlash(rel)
+				opts := append(baseOpts, pkgreader.WithPathPrefix(prefix))
 				pkg, err := pkgreader.Read(pkgPath, opts...)
-				results <- result{pkg: pkg, name: name, err: err}
+				results <- result{pkg: pkg, name: prefix, err: err}
 			}
 		}()
 	}
@@ -203,11 +207,8 @@ func BuildDatabase(ctx context.Context, log *slog.Logger, db *sql.DB, integratio
 	}()
 
 	go func() {
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				continue
-			}
-			work <- entry.Name()
+		for _, p := range pkgPaths {
+			work <- p
 		}
 		close(work)
 	}()
