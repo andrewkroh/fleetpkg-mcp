@@ -1,6 +1,6 @@
 module github.com/andrewkroh/fleetpkg-mcp
 
-go 1.26.4
+go 1.26.5
 
 require (
 	github.com/andrewkroh/go-ecs v0.0.0-20260204044457-2d67483e976a
