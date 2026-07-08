@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	github.com/andrewkroh/go-ecs v0.0.0-20260204044457-2d67483e976a
-	github.com/andrewkroh/go-package-spec v0.0.0-20260701143618-c05eaa141bc3
+	github.com/andrewkroh/go-package-spec v0.0.0-20260708170158-dfb21dd97261
 	github.com/gorilla/handlers v1.5.2
 	github.com/modelcontextprotocol/go-sdk v1.6.0
 	go.opentelemetry.io/contrib/exporters/autoexport v0.69.0
